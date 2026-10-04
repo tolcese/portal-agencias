@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Portal Agencias v0.1.1</title>
+<title>Portal Agencias v0.1.2</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
@@ -146,7 +146,7 @@ h2{margin:0;font-size:17px;line-height:24px}
 'use strict';
 
 // ===================== CONFIG =====================
-const APP_VER = '0.1.1';
+const APP_VER = '0.1.2';
 const SUPABASE_URL = 'https://unhirashjnabisxjnebf.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_rK8OeIsVb0J68Vf8OUcxRA_d8DSnSSI';
 const WHATSAPP_NUM = ''; // ej: '5493511234567' — pendiente de configurar
@@ -164,6 +164,7 @@ let S = { user:null, agencia:null, bancos:null, consultas:[], channel:null, reco
 // ===================== HELPERS =====================
 function esc(v){ return String(v==null?'':v).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 const nf = new Intl.NumberFormat('es-AR');
+function montoFin(n){ return (n==null||Number(n)===0) ? 'Máximo disponible' : money(n); }
 function money(n){ return (n==null||n==='') ? '—' : '$ ' + nf.format(Math.round(Number(n))); }
 function parseMoneda(s){
   if (s==null) return null;
@@ -512,7 +513,7 @@ function pintarLista(){
         const veh = [x.vehiculo_marca, x.vehiculo_modelo, x.vehiculo_condicion==='0km' ? '0km' : x.vehiculo_anio].filter(Boolean).join(' ');
         return '<tr class="click'+(x.estado==='respondida'?' hl':'')+'" data-id="'+x.id+'"><td>'+nro(x.id)+'</td>'
           + '<td><b>'+esc(x.cliente_nombre)+'</b><br><span class="muted">DNI '+esc(fmtDni(x.cliente_dni))+'</span></td>'
-          + '<td>'+esc(veh||'—')+'</td><td>'+money(x.monto_a_financiar)+'</td><td>'+fmtD(x.created_at)+'</td>'
+          + '<td>'+esc(veh||'—')+'</td><td>'+montoFin(x.monto_a_financiar)+'</td><td>'+fmtD(x.created_at)+'</td>'
           + '<td>'+badge(x.estado)+'</td><td><a href="#consulta/'+x.id+'">Ver</a></td></tr>';
       }).join('')
     + '</tbody></table></div>';
@@ -541,9 +542,8 @@ async function viewNueva(){
    + '<div class="f"><label for="valor">Valor del vehículo</label><input id="valor" class="money" inputmode="decimal" placeholder="$ 0"></div>'
    + '</div></section>'
    + '<section class="card"><h2>Financiación</h2><div class="grid">'
-   + '<div class="f"><label for="monto">Monto a financiar</label><input id="monto" class="money" inputmode="decimal" placeholder="$ 0"></div>'
+   + '<div class="f"><label for="monto">Monto a financiar</label><input id="monto" class="money" inputmode="decimal" placeholder="$ 0"><span class="help">Completar en caso de solicitar un monto específico. Si queda vacío, se simula por el máximo que le den al cliente.</span></div>'
    + '<div class="f"><label for="plazo">Plazo deseado</label><select id="plazo"><option value="">Indistinto (máximo posible)</option>'+PLAZOS.map(p=>'<option value="'+p+'">'+p+' meses</option>').join('')+'</select></div>'
-   + '<div class="f"><label for="msol">Monto solicitado</label><input id="msol" class="money" inputmode="decimal" placeholder="$ 0"><span class="help">Completar en caso de solicitar un monto específico</span></div>'
    + '<div class="f"><label for="banco">Banco preferido</label><select id="banco"><option value="">Todos</option>'+bancos.map(b=>'<option value="'+b.id+'">'+esc(b.nombre)+'</option>').join('')+'</select></div>'
    + '</div></section>'
    + '<section class="card"><div id="docBox" class="hidden" style="display:flex;flex-direction:column;gap:16px">'
@@ -582,8 +582,9 @@ async function viewNueva(){
     const falt = [], msgs = [];
     if (dni.length < 7 || dni.length > 8){ falt.push('dni'); msgs.push('el DNI tiene que tener 7 u 8 números'); }
     if (!v('nom')){ falt.push('nom'); msgs.push('falta el nombre y apellido'); }
-    const monto = parseMoneda(v('monto'));
-    if (!monto || monto <= 0){ falt.push('monto'); msgs.push('falta el monto a financiar (sección Financiación)'); }
+    let monto = parseMoneda(v('monto'));
+    if (monto !== null && monto < 0){ falt.push('monto'); msgs.push('el monto a financiar no puede ser negativo'); }
+    if (!monto) monto = null;
     if (falt.length){ const m = msgs.join('; '); return fail(m.charAt(0).toUpperCase() + m.slice(1) + '.', falt); }
     const anio = v('anio') ? Number(v('anio')) : null;
     if (anio && (anio < 1980 || anio > anioAct + 1)) return fail('El año del vehículo no es válido.', ['anio']);
@@ -612,7 +613,7 @@ async function viewNueva(){
         cliente_dni: dni, cliente_cuit: cuil || null, cliente_nombre: v('nom'),
         vehiculo_marca: v('marca') || null, vehiculo_modelo: v('mod') || null, vehiculo_anio: anio,
         vehiculo_condicion: $('#cond').value, valor_vehiculo: parseMoneda(v('valor')),
-        monto_a_financiar: monto, monto_solicitado: parseMoneda(v('msol')),
+        monto_a_financiar: monto,
         plazo_deseado: v('plazo') ? Number(v('plazo')) : null,
         banco_id: b ? b.id : null,
         dni_frente_path: pF, dni_dorso_path: pD,
@@ -647,8 +648,7 @@ async function viewDetalle(id, silencioso){
   const veh = [c.vehiculo_marca, c.vehiculo_modelo, c.vehiculo_condicion==='0km' ? '0km' : c.vehiculo_anio].filter(Boolean).join(' ') || '—';
   const kv = (k, val)=>'<div class="kv"><span>'+k+'</span><span>'+val+'</span></div>';
   const resumen = '<section class="card" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:20px">'
-    + kv('DNI', esc(fmtDni(c.cliente_dni))) + kv('Vehículo', esc(veh)) + kv('Monto a financiar', money(c.monto_a_financiar))
-    + (c.monto_solicitado ? kv('Monto solicitado', money(c.monto_solicitado)) : '')
+    + kv('DNI', esc(fmtDni(c.cliente_dni))) + kv('Vehículo', esc(veh)) + kv('Monto a financiar', montoFin(c.monto_a_financiar))
     + kv('Plazo deseado', c.plazo_deseado ? c.plazo_deseado+' meses' : 'Indistinto')
     + kv('Banco', c.banco ? esc(c.banco.nombre) : 'Todos') + kv('Cargada', fmtD(c.created_at,true)) + '</section>';
 

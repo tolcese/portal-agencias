@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Portal Agencias v0.1.0</title>
+<title>Portal Agencias v0.1.1</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
@@ -146,7 +146,7 @@ h2{margin:0;font-size:17px;line-height:24px}
 'use strict';
 
 // ===================== CONFIG =====================
-const APP_VER = '0.1.0';
+const APP_VER = '0.1.1';
 const SUPABASE_URL = 'https://unhirashjnabisxjnebf.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_rK8OeIsVb0J68Vf8OUcxRA_d8DSnSSI';
 const WHATSAPP_NUM = ''; // ej: '5493511234567' — pendiente de configurar
@@ -579,12 +579,12 @@ async function viewNueva(){
     const fail = (m, ids)=>{ er.textContent=m; er.classList.remove('hidden'); (ids||[]).forEach(id=>{ const n=$('#'+id); n && n.closest('.f') && n.closest('.f').classList.add('err'); }); er.scrollIntoView({block:'center'}); };
     const v = id=>$('#'+id).value.trim();
     const dni = soloDigitos(v('dni'));
-    const falt = [];
-    if (dni.length < 7 || dni.length > 8) falt.push('dni');
-    if (!v('nom')) falt.push('nom');
+    const falt = [], msgs = [];
+    if (dni.length < 7 || dni.length > 8){ falt.push('dni'); msgs.push('el DNI tiene que tener 7 u 8 números'); }
+    if (!v('nom')){ falt.push('nom'); msgs.push('falta el nombre y apellido'); }
     const monto = parseMoneda(v('monto'));
-    if (!monto || monto <= 0) falt.push('monto');
-    if (falt.length) return fail('Revisá los campos marcados: DNI (7 u 8 números), nombre y monto a financiar son obligatorios.', falt);
+    if (!monto || monto <= 0){ falt.push('monto'); msgs.push('falta el monto a financiar (sección Financiación)'); }
+    if (falt.length){ const m = msgs.join('; '); return fail(m.charAt(0).toUpperCase() + m.slice(1) + '.', falt); }
     const anio = v('anio') ? Number(v('anio')) : null;
     if (anio && (anio < 1980 || anio > anioAct + 1)) return fail('El año del vehículo no es válido.', ['anio']);
     const cuil = soloDigitos(v('cuil'));

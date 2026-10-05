@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Operadores · Portal Agencias v0.1.0</title>
+<title>Operadores · Portal Agencias v0.2.0</title>
 <meta name="robots" content="noindex">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -174,7 +174,7 @@ h2{margin:0;font-size:17px;line-height:24px}
 'use strict';
 
 // ===================== CONFIG =====================
-const APP_VER = '0.1.0';
+const APP_VER = '0.2.0';
 const SUPABASE_URL = 'https://unhirashjnabisxjnebf.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_rK8OeIsVb0J68Vf8OUcxRA_d8DSnSSI';
 window.OPERADOR_VER = APP_VER;
@@ -202,6 +202,9 @@ function parseMoneda(s){
   const n = Number(t);
   return isFinite(n) ? n : null;
 }
+function parsePct(s){ if (s==null) return null; const t = String(s).replace('%','').replace(',', '.').trim(); if (!t) return null; const n = Number(t); return isFinite(n) ? n : null; }
+function fmtPct(n){ return n==null ? '—' : String(Math.round(n*100)/100).replace('.', ',') + ' %'; }
+function netoDe(bruto, pct){ return (bruto==null || pct==null) ? null : Math.round(bruto * (1 - pct/100)); }
 function fmtMonedaInput(el){ const n = parseMoneda(el.value); el.value = n==null ? '' : '$ ' + nf.format(n); }
 function fmtD(d, conHora){
   if (!d) return '—';
@@ -274,6 +277,7 @@ function route(){
   if (!S.op) return viewNoOp();
   if (h.indexOf('#consulta/') === 0) return viewConsulta(Number(h.split('/')[1]));
   if (h === '#agencias') return viewAgencias();
+  if (h === '#historial') return viewHistorial();
   return viewBandeja();
 }
 
@@ -352,7 +356,7 @@ function shell(activo, contenido, cnt){
   cnt = cnt || {};
   const item = (h, t, n)=>'<a class="nav'+(activo===h?' on':'')+'" href="'+h+'">'+t+(n?'<span class="cnt">'+n+'</span>':'')+'</a>';
   return '<div class="shell"><nav class="side" aria-label="Menú"><div class="brand" style="padding-bottom:4px">Portal Agencias</div><div style="color:#A9B8D0;font-size:13px;padding:0 12px 20px">Panel operador</div>'
-    + item('#bandeja','Bandeja', cnt.nuevas) + item('#agencias','Agencias', esAdmin() ? cnt.pend : 0)
+    + item('#bandeja','Bandeja', cnt.nuevas) + item('#historial','Historial') + item('#agencias','Agencias', esAdmin() ? cnt.pend : 0)
     + '<div class="side-foot"><span>'+esc(S.op.nombre)+' · '+esc(S.op.rol)+'</span><button id="bOut">Cerrar sesión</button><span style="opacity:.7">v'+APP_VER+'</span></div></nav>'
     + '<main class="main"><div class="wrap">'+contenido+'</div></main></div>';
 }
@@ -522,7 +526,7 @@ async function viewAgencias(silencioso){
 function bancosDisponibles(prov){ return S.bancos.filter(b=>b.activo && (!b.provincias || b.provincias.indexOf(prov) >= 0)); }
 function bloqueVacio(banco, plazoDeseado){
   const plazos = plazoDeseado ? [plazoDeseado] : PLAZOS.slice();
-  return { banco_id: banco ? banco.id : null, resultado:'aprobado', monto:'', vigencia:'', fija:true, uva: !!(banco && banco.admite_uva),
+  return { banco_id: banco ? banco.id : null, resultado:'aprobado', monto:'', pct:'', vigencia:'', fija:true, uva: !!(banco && banco.admite_uva),
     filas: plazos.map(p=>({ plazo:p, fija:'', uva:'' })), requisitos:'', motivo:'' };
 }
 
@@ -530,7 +534,7 @@ async function viewConsulta(id){
   app.innerHTML = shell('#bandeja', cargando('Cargando consulta…')); bindShell();
   const [rc, ro] = await Promise.all([
     sb.from('consultas').select('*, agencia:agencias(razon_social,provincia,responsable,telefono,email)').eq('id', id).maybeSingle(),
-    sb.from('ofertas').select('id,banco_id,resultado,monto_aprobado,vigencia_hasta,requisitos,cuotas:oferta_cuotas(id,plazo_meses,tipo_tasa,cuota),motivo:ofertas_motivos(motivo)').eq('consulta_id', id)
+    sb.from('ofertas').select('id,banco_id,resultado,monto_aprobado,vigencia_hasta,requisitos,cuotas:oferta_cuotas(id,plazo_meses,tipo_tasa,cuota),interna:ofertas_internas(motivo,comision_pct)').eq('consulta_id', id)
   ]);
   if (rc.error) return toast(errMsg(rc.error));
   const c = rc.data;
@@ -546,8 +550,9 @@ async function viewConsulta(id){
       const banco = S.bancos.find(b=>b.id===o.banco_id);
       const cu = o.cuotas || [];
       const plazos = Array.from(new Set(cu.map(q=>q.plazo_meses))).sort((a,b)=>a-b);
-      const mot = Array.isArray(o.motivo) ? (o.motivo[0]||{}).motivo : (o.motivo||{}).motivo;
-      return { banco_id:o.banco_id, resultado:o.resultado, monto: o.monto_aprobado!=null ? '$ '+nf.format(o.monto_aprobado) : '', vigencia:o.vigencia_hasta||'',
+      const inn = (Array.isArray(o.interna) ? o.interna[0] : o.interna) || {};
+      const mot = inn.motivo;
+      return { banco_id:o.banco_id, resultado:o.resultado, monto: o.monto_aprobado!=null ? '$ '+nf.format(o.monto_aprobado) : '', pct: inn.comision_pct!=null ? String(inn.comision_pct).replace('.', ',') : '', neto:o.monto_neto, vigencia:o.vigencia_hasta||'',
         fija: cu.length ? cu.some(q=>q.tipo_tasa==='fija') : true, uva: cu.some(q=>q.tipo_tasa==='uva'),
         filas: plazos.length ? plazos.map(p=>{ const f = cu.find(q=>q.plazo_meses===p && q.tipo_tasa==='fija'), u = cu.find(q=>q.plazo_meses===p && q.tipo_tasa==='uva');
           return { plazo:p, fija: f ? '$ '+nf.format(f.cuota) : '', uva: u ? '$ '+nf.format(u.cuota) : '' }; }) : (banco ? bloqueVacio(banco, c.plazo_deseado).filas : []),
@@ -558,7 +563,6 @@ async function viewConsulta(id){
   } else {
     bloques = disp.map(b=>bloqueVacio(b, c.plazo_deseado));
   }
-  bloques.forEach(b=>{ if (!b.monto && c.monto_a_financiar) b.monto = '$ '+nf.format(c.monto_a_financiar); });
   let aceptada = '';
   if (c.cuota_aceptada_id){
     ofertas.forEach(o=>(o.cuotas||[]).forEach(q=>{
@@ -586,7 +590,7 @@ function syncEd(){
     const b = S.ed.bloques[i]; if (!b) return;
     b.banco_id = Number($('[data-k=banco]', el).value) || null;
     if (b.resultado === 'aprobado'){
-      b.monto = $('[data-k=monto]', el).value; b.vigencia = $('[data-k=vig]', el).value;
+      b.monto = $('[data-k=monto]', el).value; b.pct = $('[data-k=pct]', el).value; b.vigencia = $('[data-k=vig]', el).value;
       b.fija = $('[data-k=tfija]', el).checked; b.uva = $('[data-k=tuva]', el).checked;
       $$('tr[data-fila]', el).forEach((tr, j)=>{
         const f = b.filas[j]; if (!f) return;
@@ -615,7 +619,7 @@ function pintarConsulta(){
     + kv('Agencia', esc(c.agencia?c.agencia.razon_social:'—')+'<br><span class="muted" style="font-size:13px">'+esc(c.agencia?(c.agencia.responsable+' · '+c.agencia.telefono):'')+'</span>')
     + kv('Cliente', esc(c.cliente_nombre)+'<br><span class="muted" style="font-size:13px">DNI '+esc(fmtDni(c.cliente_dni))+(c.cliente_cuit?' · CUIL '+esc(fmtCuit(c.cliente_cuit)):'')+'</span>')
     + kv('Vehículo', esc(veh)+(c.valor_vehiculo?'<br><span class="muted" style="font-size:13px">Valor '+money(c.valor_vehiculo)+'</span>':''))
-    + kv('Monto a financiar', montoFin(c.monto_a_financiar), c.monto_a_financiar?'':'font-weight:700;color:var(--b-r)')
+    + kv('Necesita el cliente (neto)', montoFin(c.monto_a_financiar), c.monto_a_financiar?'':'font-weight:700;color:var(--b-r)')
     + kv('Plazo deseado', c.plazo_deseado ? c.plazo_deseado+' meses' : 'Indistinto', c.plazo_deseado?'':'font-weight:700;color:var(--b-r)')
     + kv('Banco', esc(bancoPed)) + kv('BCRA', bcraTxt(c.bcra_resultado)) + kv('Cargada', fmtD(c.created_at,true))
     + (c.dni_frente_path ? kv('DNI', '<button class="btn-link" data-dni="'+esc(c.dni_frente_path)+'">Frente</button> · <button class="btn-link" data-dni="'+esc(c.dni_dorso_path)+'">Dorso</button>') : '')
@@ -648,8 +652,11 @@ function bloqueHtml(b, i, disp){
     h += '<div class="f"><label>Motivo (solo lo ven los operadores)</label><input data-k="mot" value="'+esc(b.motivo)+'"></div></article>';
     return h;
   }
-  h += '<div class="grid"><div class="f"><label>Monto aprobado</label><input data-k="monto" class="money" inputmode="decimal" value="'+esc(b.monto)+'"></div>'
+  h += '<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))"><div class="f"><label>Monto aprobado (bruto)</label><input data-k="monto" class="money" inputmode="decimal" value="'+esc(b.monto)+'"></div>'
+    + '<div class="f"><label>% comisión (interno)</label><input data-k="pct" inputmode="decimal" placeholder="Ej: 10" value="'+esc(b.pct)+'"></div>'
+    + '<div class="f"><label>Le queda al cliente (neto)</label><div data-neto style="min-height:44px;display:flex;align-items:center;padding:0 12px;border-radius:8px;background:#EAF5EE;color:var(--green);font-weight:700">—</div></div>'
     + '<div class="f"><label>Vigente hasta</label><input data-k="vig" type="date" value="'+esc(b.vigencia)+'"></div></div>'
+    + '<div data-hint class="muted" style="font-size:13px;margin-top:-6px"></div>'
     + '<div class="row" style="gap:20px"><span class="lbl">Tipo de tasa</span><label class="chk"><input type="checkbox" data-k="tfija"'+(b.fija?' checked':'')+'>Fija</label>'
     + '<label class="chk'+(okUva?'':' dis')+'"><input type="checkbox" data-k="tuva"'+(b.uva?' checked':'')+(okUva?'':' disabled')+'>UVA</label>'
     + (okUva?'':'<span class="muted" style="font-size:13px">'+esc(banco.nombre)+' solo opera con tasa fija</span>') + '</div>'
@@ -673,7 +680,7 @@ function soloLectura(){
     const banco = (S.bancos.find(x=>x.id===b.banco_id)||{}).nombre || '—';
     if (b.resultado==='rechazado') return '<article class="bank" style="flex-direction:row;justify-content:space-between;align-items:center;flex-wrap:wrap"><h3>'+esc(banco)+'</h3><span class="row"><span class="muted" style="font-size:13px">'+esc(b.motivo)+'</span><span class="b b-rechazado">Rechazado</span></span></article>';
     return '<article class="bank"><div class="row between"><h3>'+esc(banco)+'</h3><span class="b b-aprobado">Aprobado</span></div>'
-      + '<div class="row" style="gap:32px"><div class="kv"><span>Monto aprobado</span><span class="big">'+esc(b.monto||'—')+'</span></div>'+(b.vigencia?'<div class="kv"><span>Vigente hasta</span><span class="big">'+esc(b.vigencia.split('-').reverse().join('/'))+'</span></div>':'')+'</div>'
+      + '<div class="row" style="gap:32px"><div class="kv"><span>Bruto (banco)</span><span class="big">'+esc(b.monto||'—')+'</span></div><div class="kv"><span>% comisión</span><span class="big">'+(b.pct?esc(b.pct)+' %':'—')+'</span></div><div class="kv"><span>Neto (cliente)</span><span class="big" style="color:var(--green)">'+money(b.neto)+'</span></div>'+(b.vigencia?'<div class="kv"><span>Vigente hasta</span><span class="big">'+esc(b.vigencia.split('-').reverse().join('/'))+'</span></div>':'')+'</div>'
       + '<div style="border:1px solid var(--line2);border-radius:10px;overflow-x:auto"><table class="pt"><thead><tr><th>Plazo</th>'+(b.fija?'<th>Tasa fija</th>':'')+(b.uva?'<th>UVA · cuota inicial</th>':'')+'</tr></thead><tbody>'
       + b.filas.map(f=>'<tr><td><b>'+f.plazo+' cuotas</b></td>'+(b.fija?'<td>'+esc(f.fija||'—')+'</td>':'')+(b.uva?'<td>'+esc(f.uva||'—')+'</td>':'')+'</tr>').join('')
       + '</tbody></table></div>'+(b.requisitos?'<p style="margin:0;font-size:14px"><b>Requisitos:</b> '+esc(b.requisitos)+'</p>':'')+'</article>';
@@ -698,6 +705,15 @@ function bindConsulta(){
   if (!ed.editable) return;
   const re = ()=>{ ed.sucio = true; pintarConsulta(); };
   $$('.money').forEach(el=> el.addEventListener('blur', ()=>fmtMonedaInput(el)));
+  const calcNeto = el=>{
+    const box = $('[data-neto]', el); if (!box) return;
+    const bruto = parseMoneda($('[data-k=monto]', el).value), pct = parsePct($('[data-k=pct]', el).value);
+    const neto = netoDe(bruto, pct);
+    box.textContent = neto==null ? '—' : money(neto);
+    const hint = $('[data-hint]', el), pide = c.monto_a_financiar;
+    if (hint) hint.textContent = (pide && pct != null && pct < 100) ? 'Para que al cliente le queden '+money(pide)+' con '+fmtPct(pct)+', hay que pedir al banco '+money(Math.ceil(pide / (1 - pct/100)))+'.' : '';
+  };
+  $$('.blq').forEach(el=>{ calcNeto(el); ['monto','pct'].forEach(k=>{ const i = $('[data-k='+k+']', el); if (i) i.addEventListener('input', ()=>calcNeto(el)); }); });
   $$('.blq input, .blq select, .blq textarea').forEach(el=> el.addEventListener('input', ()=>{ ed.sucio = true; }));
   $$('.blq').forEach((el)=>{
     const i = Number(el.dataset.i), b = ed.bloques[i];
@@ -768,7 +784,9 @@ async function guardar(){
     const banco = S.bancos.find(x=>x.id===b.banco_id);
     if (b.resultado === 'rechazado'){ planes.push({ b, banco, cuotas:[] }); continue; }
     const monto = parseMoneda(b.monto);
-    if (!monto || monto <= 0) return mostrarErr(banco.nombre+': falta el monto aprobado.'), false;
+    if (!monto || monto <= 0) return mostrarErr(banco.nombre+': falta el monto aprobado (bruto).'), false;
+    const pct = parsePct(b.pct);
+    if (pct == null || pct < 0 || pct >= 100) return mostrarErr(banco.nombre+': cargá el % de comisión (entre 0 y 99,99). Si no cobran comisión, poné 0.'), false;
     if (!b.fija && !b.uva) return mostrarErr(banco.nombre+': elegí al menos un tipo de tasa.'), false;
     const plazos = b.filas.map(f=>f.plazo);
     if (new Set(plazos).size !== plazos.length) return mostrarErr(banco.nombre+': hay un plazo repetido.'), false;
@@ -778,7 +796,7 @@ async function guardar(){
       if (b.uva && banco.admite_uva){ const v = parseMoneda(f.uva); if (v) cuotas.push({ plazo_meses:f.plazo, tipo_tasa:'uva', cuota:v }); }
     }
     if (!cuotas.length) return mostrarErr(banco.nombre+': cargá al menos una cuota.'), false;
-    planes.push({ b, banco, monto, cuotas });
+    planes.push({ b, banco, monto, pct, neto: netoDe(monto, pct), cuotas });
   }
   try{
     // borrar bancos quitados
@@ -790,7 +808,7 @@ async function guardar(){
       const aprob = p.b.resultado === 'aprobado';
       const { data: of, error: e1 } = await sb.from('ofertas').upsert({
         consulta_id:c.id, banco_id:p.b.banco_id, resultado:p.b.resultado,
-        monto_aprobado: aprob ? p.monto : null, vigencia_hasta: aprob && p.b.vigencia ? p.b.vigencia : null,
+        monto_aprobado: aprob ? p.monto : null, monto_neto: aprob ? p.neto : null, vigencia_hasta: aprob && p.b.vigencia ? p.b.vigencia : null,
         requisitos: aprob ? (p.b.requisitos.trim() || null) : null, cargado_por:S.user.id
       }, { onConflict:'consulta_id,banco_id' }).select('id').single();
       if (e1) throw e1;
@@ -800,15 +818,158 @@ async function guardar(){
         const { error: e3 } = await sb.from('oferta_cuotas').insert(p.cuotas.map(q=>Object.assign({ oferta_id:of.id }, q)));
         if (e3) throw e3;
       }
-      const mot = !aprob ? (p.b.motivo||'').trim() : '';
-      if (mot){ const { error } = await sb.from('ofertas_motivos').upsert({ oferta_id:of.id, motivo:mot }); if (error) throw error; }
-      else { const { error } = await sb.from('ofertas_motivos').delete().eq('oferta_id', of.id); if (error) throw error; }
+      const mot = !aprob ? ((p.b.motivo||'').trim() || null) : null;
+      const pctI = aprob ? p.pct : null;
+      if (mot != null || pctI != null){ const { error } = await sb.from('ofertas_internas').upsert({ oferta_id:of.id, motivo:mot, comision_pct:pctI }); if (error) throw error; }
+      else { const { error } = await sb.from('ofertas_internas').delete().eq('oferta_id', of.id); if (error) throw error; }
     }
     return true;
   } catch(e){
     mostrarErr('No se pudo guardar: ' + errMsg(e));
     return false;
   }
+}
+
+// ===================== HISTORIAL =====================
+function hoyISO(d){ const x = d || new Date(); return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0'); }
+if (!S.hist) S.hist = { desde: hoyISO(new Date(Date.now()-30*864e5)), hasta: hoyISO(), agencia:'', operador:'', banco:'', estado:'trabajadas', datos:[] };
+
+function aceptadaDe(c){
+  if (!c.cuota_aceptada_id) return null;
+  for (const o of (c.ofertas||[])) for (const q of (o.cuotas||[])) if (q.id === c.cuota_aceptada_id) return { o, q };
+  return null;
+}
+function internaDe(o){ return (Array.isArray(o.interna) ? o.interna[0] : o.interna) || {}; }
+
+async function viewHistorial(){
+  const H = S.hist;
+  app.innerHTML = shell('#historial', cargando('Cargando historial…')); bindShell();
+  const hasta = new Date(H.hasta+'T23:59:59');
+  const { data, error } = await sb.from('consultas')
+    .select('id,agencia_id,cliente_nombre,cliente_dni,vehiculo_marca,vehiculo_modelo,vehiculo_anio,vehiculo_condicion,monto_a_financiar,plazo_deseado,banco_id,estado,operador_id,created_at,tomada_at,respondida_at,updated_at,cuota_aceptada_id,'
+      + 'agencia:agencias(razon_social),ofertas(id,banco_id,resultado,monto_aprobado,monto_neto,interna:ofertas_internas(comision_pct,motivo),cuotas:oferta_cuotas(id,plazo_meses,tipo_tasa,cuota))')
+    .gte('created_at', new Date(H.desde+'T00:00:00').toISOString()).lte('created_at', hasta.toISOString())
+    .order('created_at', { ascending:false }).limit(2000);
+  if (error){ toast(errMsg(error)); return; }
+  H.datos = data || [];
+  pintarHistorial();
+}
+
+function filtrarHist(){
+  const H = S.hist;
+  return H.datos.filter(c=>{
+    if (H.estado === 'trabajadas' && c.estado === 'nueva') return false;
+    if (H.estado && H.estado !== 'trabajadas' && c.estado !== H.estado) return false;
+    if (H.agencia && c.agencia_id !== H.agencia) return false;
+    if (H.operador && c.operador_id !== H.operador) return false;
+    if (H.banco && !(c.ofertas||[]).some(o=>String(o.banco_id)===H.banco)) return false;
+    return true;
+  });
+}
+
+function pintarHistorial(){
+  const H = S.hist, rows = filtrarHist();
+  const bn = id=> (S.bancos.find(b=>b.id===id)||{}).nombre || '—';
+  const resp = rows.filter(c=>c.respondida_at);
+  const acept = rows.filter(c=>c.estado==='aceptada');
+  let comision = 0;
+  acept.forEach(c=>{ const a = aceptadaDe(c); if (a && a.o.monto_aprobado!=null && a.o.monto_neto!=null) comision += a.o.monto_aprobado - a.o.monto_neto; });
+  const prom = resp.length ? resp.reduce((s,c)=>s + (new Date(c.respondida_at) - new Date(c.created_at)), 0)/resp.length : null;
+  const tile = (t,v,col)=>'<div class="tile"><span>'+t+'</span><span style="font-size:24px;'+(col?'color:'+col:'')+'">'+v+'</span></div>';
+
+  const agOpts = Array.from(new Map(H.datos.map(c=>[c.agencia_id, c.agencia?c.agencia.razon_social:'—'])).entries()).sort((a,b)=>a[1].localeCompare(b[1]));
+  const sel = (id, lbl, opts, val)=>'<div class="f" style="min-width:160px;flex:1 1 160px"><label for="'+id+'">'+lbl+'</label><select id="'+id+'">'+opts.map(o=>'<option value="'+esc(o[0])+'"'+(String(val)===String(o[0])?' selected':'')+'>'+esc(o[1])+'</option>').join('')+'</select></div>';
+
+  let html = '<div class="row between"><h1>Historial</h1><button class="btn btn-s" id="bXls">Exportar a Excel</button></div>'
+    + '<section class="card" style="flex-direction:row;flex-wrap:wrap;align-items:flex-end;gap:12px">'
+    + '<div class="f" style="flex:1 1 150px"><label for="hD">Desde</label><input type="date" id="hD" value="'+H.desde+'"></div>'
+    + '<div class="f" style="flex:1 1 150px"><label for="hH">Hasta</label><input type="date" id="hH" value="'+H.hasta+'"></div>'
+    + sel('hE','Estado',[['trabajadas','Todas las trabajadas'],['en_analisis','En análisis'],['respondida','Respondidas'],['aceptada','Aceptadas'],['desistida','Desistidas'],['','Todas (incluye nuevas)']], H.estado)
+    + sel('hA','Agencia',[['','Todas']].concat(agOpts), H.agencia)
+    + sel('hO','Operador',[['','Todos']].concat(Object.values(S.ops).map(o=>[o.id,o.nombre])), H.operador)
+    + sel('hB','Banco',[['','Todos']].concat(S.bancos.map(b=>[String(b.id),b.nombre])), H.banco)
+    + '</section>'
+    + '<div class="tiles">' + tile('Consultas', rows.length) + tile('Respondidas', resp.length, 'var(--b-r)') + tile('Aceptadas', acept.length + (resp.length?' <span style="font-size:15px;color:var(--muted)">('+Math.round(acept.length*100/resp.length)+' %)</span>':''), 'var(--green)')
+    + tile('Comisión en aceptadas', money(comision)) + tile('Respuesta promedio', prom==null?'—':dur(prom)) + '</div>';
+
+  if (!rows.length) html += '<div class="tbox"><div class="empty">No hay consultas con estos filtros.</div></div>';
+  else html += '<div class="tbox"><table class="t" style="min-width:1100px"><thead><tr><th>N° / fecha</th><th>Agencia · cliente</th><th>Operador</th><th>Bancos (bruto → neto · %)</th><th>Resultado</th><th>Respuesta</th><th></th></tr></thead><tbody>'
+    + rows.map(c=>{
+      const ofs = (c.ofertas||[]).slice().sort((a,b)=>(a.resultado===b.resultado?0:(a.resultado==='aprobado'?-1:1)));
+      const a = aceptadaDe(c);
+      const bancosTxt = ofs.length ? ofs.map(o=>{
+        const inn = internaDe(o);
+        if (o.resultado==='rechazado') return '<div><span style="color:#8C1D18">✗</span> '+esc(bn(o.banco_id))+(inn.motivo?' <span class="muted">· '+esc(inn.motivo)+'</span>':'')+'</div>';
+        const esA = a && a.o.id === o.id;
+        return '<div'+(esA?' style="font-weight:700"':'')+'><span style="color:var(--green)">✓</span> '+esc(bn(o.banco_id))+': '+money(o.monto_aprobado)+' → '+money(o.monto_neto)+' <span class="muted">· '+fmtPct(inn.comision_pct)+'</span></div>';
+      }).join('') : '<span class="muted">Sin ofertas</span>';
+      const res = c.estado==='aceptada' && a ? badge('aceptada')+'<div style="font-size:13px;margin-top:4px">'+esc(bn(a.o.banco_id))+' · '+a.q.plazo_meses+' cuotas '+(a.q.tipo_tasa==='uva'?'UVA':'fija')+' · '+money(a.q.cuota)+'</div>' : badge(c.estado);
+      return '<tr class="click" data-id="'+c.id+'"><td><b>'+nro(c.id)+'</b><br><span class="muted">'+fmtD(c.created_at,true)+'</span></td>'
+        + '<td>'+esc(c.agencia?c.agencia.razon_social:'—')+'<br><span class="muted">'+esc(c.cliente_nombre)+' · DNI '+esc(fmtDni(c.cliente_dni))+'</span></td>'
+        + '<td>'+(c.operador_id?esc(opNombre(c.operador_id)):'<span class="muted">—</span>')+'</td>'
+        + '<td style="font-size:13px;line-height:20px">'+bancosTxt+'</td><td>'+res+'</td>'
+        + '<td>'+(c.respondida_at?dur(new Date(c.respondida_at)-new Date(c.created_at)):'<span class="muted">—</span>')+'</td><td><a href="#consulta/'+c.id+'">Ver</a></td></tr>';
+    }).join('') + '</tbody></table></div>';
+
+  app.innerHTML = shell('#historial', html); bindShell();
+  const recargarFechas = ()=>{ H.desde = $('#hD').value || H.desde; H.hasta = $('#hH').value || H.hasta; viewHistorial(); };
+  $('#hD').onchange = recargarFechas; $('#hH').onchange = recargarFechas;
+  $('#hE').onchange = e=>{ H.estado = e.target.value; pintarHistorial(); };
+  $('#hA').onchange = e=>{ H.agencia = e.target.value; pintarHistorial(); };
+  $('#hO').onchange = e=>{ H.operador = e.target.value; pintarHistorial(); };
+  $('#hB').onchange = e=>{ H.banco = e.target.value; pintarHistorial(); };
+  $$('tr.click').forEach(tr=> tr.onclick = e=>{ if (e.target.tagName !== 'A') go('#consulta/'+tr.dataset.id); });
+  $('#bXls').onclick = e=> exportarHist(e.currentTarget);
+}
+
+function cargarXLSX(){
+  if (window.XLSX) return Promise.resolve(window.XLSX);
+  return new Promise((res, rej)=>{
+    const sc = document.createElement('script');
+    sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    sc.onload = ()=>res(window.XLSX); sc.onerror = ()=>rej(new Error('No se pudo cargar el exportador de Excel'));
+    document.head.appendChild(sc);
+  });
+}
+async function exportarHist(btn){
+  const rows = filtrarHist();
+  if (!rows.length) return toast('No hay datos para exportar.');
+  busy(btn, true, 'Generando…');
+  try{
+    const XLSX = await cargarXLSX();
+    const bn = id=> (S.bancos.find(b=>b.id===id)||{}).nombre || '';
+    const out = [];
+    rows.forEach(c=>{
+      const a = aceptadaDe(c);
+      const base = {
+        'N°': c.id, 'Fecha carga': new Date(c.created_at).toLocaleString('es-AR'), 'Agencia': c.agencia?c.agencia.razon_social:'',
+        'Cliente': c.cliente_nombre, 'DNI': c.cliente_dni,
+        'Vehículo': [c.vehiculo_marca,c.vehiculo_modelo,c.vehiculo_condicion==='0km'?'0km':c.vehiculo_anio].filter(Boolean).join(' '),
+        'Necesita (neto pedido)': c.monto_a_financiar!=null ? Number(c.monto_a_financiar) : 'Máximo',
+        'Plazo pedido': c.plazo_deseado || 'Indistinto', 'Banco pedido': c.banco_id ? bn(c.banco_id) : 'Todos',
+        'Operador': c.operador_id ? opNombre(c.operador_id) : '', 'Estado': ESTADOS[c.estado]||c.estado,
+        'Respondida': c.respondida_at ? new Date(c.respondida_at).toLocaleString('es-AR') : '',
+        'Horas de respuesta': c.respondida_at ? Math.round((new Date(c.respondida_at)-new Date(c.created_at))/36e5*10)/10 : ''
+      };
+      const ofs = c.ofertas || [];
+      if (!ofs.length){ out.push(Object.assign({}, base, { 'Banco':'', 'Resultado':'', 'Bruto':'', '% comisión':'', 'Neto':'', 'Comisión $':'', 'Motivo rechazo':'', 'Aceptada':'', 'Opción aceptada':'' })); return; }
+      ofs.forEach(o=>{
+        const inn = internaDe(o), esA = a && a.o.id === o.id;
+        out.push(Object.assign({}, base, {
+          'Banco': bn(o.banco_id), 'Resultado': o.resultado==='aprobado'?'Aprobado':'Rechazado',
+          'Bruto': o.monto_aprobado!=null?Number(o.monto_aprobado):'', '% comisión': inn.comision_pct!=null?Number(inn.comision_pct):'',
+          'Neto': o.monto_neto!=null?Number(o.monto_neto):'', 'Comisión $': (o.monto_aprobado!=null&&o.monto_neto!=null)?Number(o.monto_aprobado)-Number(o.monto_neto):'',
+          'Motivo rechazo': inn.motivo||'', 'Aceptada': esA?'Sí':'',
+          'Opción aceptada': esA ? a.q.plazo_meses+' cuotas '+(a.q.tipo_tasa==='uva'?'UVA':'fija')+' · $ '+nf.format(a.q.cuota) : ''
+        }));
+      });
+    });
+    const ws = XLSX.utils.json_to_sheet(out);
+    ws['!cols'] = Object.keys(out[0]).map(k=>({ wch: Math.max(10, Math.min(40, k.length+4)) }));
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Historial');
+    XLSX.writeFile(wb, 'historial_'+S.hist.desde+'_a_'+S.hist.hasta+'.xlsx');
+  } catch(e){ toast(errMsg(e)); }
+  busy(btn, false);
 }
 
 window.addEventListener('beforeunload', e=>{ if (S.ed && S.ed.sucio && S.ed.editable){ e.preventDefault(); e.returnValue=''; } });

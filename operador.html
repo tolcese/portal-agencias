@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Operadores · Portal Agencias v0.2.2</title>
+<title>Operadores · Portal Agencias v0.2.3</title>
 <meta name="robots" content="noindex">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -174,7 +174,7 @@ h2{margin:0;font-size:17px;line-height:24px}
 'use strict';
 
 // ===================== CONFIG =====================
-const APP_VER = '0.2.2';
+const APP_VER = '0.2.3';
 const VER_KEY = 'operador';
 const SUPABASE_URL = 'https://unhirashjnabisxjnebf.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_rK8OeIsVb0J68Vf8OUcxRA_d8DSnSSI';
@@ -684,7 +684,8 @@ function bloqueHtml(b, i, disp){
   let h = '<article class="card blq" data-i="'+i+'"><div class="row between" style="align-items:flex-end">'
     + '<div class="f" style="width:220px"><label>Banco</label><select data-k="banco"><option value="">Elegir…</option>'+opts+'</select></div>'
     + '<div class="row" style="gap:8px"><div class="seg"><button type="button" data-res="aprobado" class="'+(b.resultado==='aprobado'?'on-ok':'')+'">Aprobado</button><button type="button" data-res="rechazado" class="'+(b.resultado==='rechazado'?'on-no':'')+'">Rechazado</button></div>'
-    + '<button type="button" class="x" data-delb title="Quitar este banco" aria-label="Quitar este banco">✕</button></div></div>';
+    + '<button type="button" class="x" data-delb title="Quitar este banco" aria-label="Quitar este banco">✕</button></div></div>'
+    + (banco && banco.requiere_dni && !S.ed.c.dni_frente_path ? '<div class="alert" style="background:#FFF4EC;border-color:#F1D5C4;color:#9A3D12">La agencia no cargó el DNI. Para '+esc(banco.nombre)+' hay que pedírselo o marcarlo como rechazado.</div>' : '');
   if (b.resultado === 'rechazado'){
     h += '<div class="f"><label>Motivo (solo lo ven los operadores)</label><input data-k="mot" value="'+esc(b.motivo)+'"></div></article>';
     return h;

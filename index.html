@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Portal Agencias v0.1.4</title>
+<title>Portal Agencias v0.1.5</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
@@ -146,7 +146,7 @@ h2{margin:0;font-size:17px;line-height:24px}
 'use strict';
 
 // ===================== CONFIG =====================
-const APP_VER = '0.1.4';
+const APP_VER = '0.1.5';
 const VER_KEY = 'portal';
 const SUPABASE_URL = 'https://unhirashjnabisxjnebf.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_rK8OeIsVb0J68Vf8OUcxRA_d8DSnSSI';
@@ -200,10 +200,10 @@ function toast(msg){
   t.textContent = msg; t.classList.remove('hidden');
   clearTimeout(toastT); toastT = setTimeout(()=>t.classList.add('hidden'), 4000);
 }
-function confirmar(texto, okTxt){
+function confirmar(texto, okTxt, cancelTxt){
   return new Promise(res=>{
     const ov = document.createElement('div'); ov.className='ov';
-    ov.innerHTML = '<div class="modal" role="dialog" aria-modal="true"><p>'+esc(texto)+'</p><div class="row" style="justify-content:flex-end"><button class="btn btn-s" data-r="0">Cancelar</button><button class="btn btn-p" data-r="1">'+esc(okTxt||'Confirmar')+'</button></div></div>';
+    ov.innerHTML = '<div class="modal" role="dialog" aria-modal="true"><p>'+esc(texto)+'</p><div class="row" style="justify-content:flex-end"><button class="btn btn-s" data-r="0">'+esc(cancelTxt||'Cancelar')+'</button><button class="btn btn-p" data-r="1">'+esc(okTxt||'Confirmar')+'</button></div></div>';
     document.body.appendChild(ov);
     ov.addEventListener('click', e=>{
       const r = e.target.getAttribute && e.target.getAttribute('data-r');
@@ -584,7 +584,7 @@ async function viewNueva(){
    + '<div class="f"><label for="banco">Banco preferido</label><select id="banco"><option value="">Todos</option>'+bancos.map(b=>'<option value="'+b.id+'">'+esc(b.nombre)+'</option>').join('')+'</select></div>'
    + '</div></section>'
    + '<section class="card"><div id="docBox" class="hidden" style="display:flex;flex-direction:column;gap:16px">'
-   + '<div><h2>Documentación</h2><p style="margin:4px 0 0;font-size:14px;color:var(--b-r);font-weight:600">Solo en caso de simulación con Banco ICBC</p></div>'
+   + '<div style="display:flex;flex-direction:column;gap:8px"><h2>Documentación</h2><div id="docAviso" style="padding:12px 14px;border-radius:8px;background:#FFF4EC;border:1px solid #F1D5C4;color:#9A3D12;font-size:14px;line-height:20px;font-weight:600"></div></div>'
    + '<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">'
    + '<label class="drop" id="dF"><b>DNI frente</b><span class="muted" data-t>Tocá para subir una foto</span><input type="file" id="fF" accept="image/*,application/pdf"></label>'
    + '<label class="drop" id="dD"><b>DNI dorso</b><span class="muted" data-t>Tocá para subir una foto</span><input type="file" id="fD" accept="image/*,application/pdf"></label>'
@@ -598,7 +598,16 @@ async function viewNueva(){
   $$('.money').forEach(el=> el.addEventListener('blur', ()=>fmtMonedaInput(el)));
   const docBox = $('#docBox');
   const bancoSel = ()=> bancos.find(b=>String(b.id)===$('#banco').value);
-  const actDoc = ()=>{ const b = bancoSel(); docBox.classList.toggle('hidden', !(b && b.requiere_dni)); };
+  const conDni = bancos.filter(x=>x.requiere_dni);
+  const nombresDni = conDni.map(x=>x.nombre).join(' y ');
+  const actDoc = ()=>{
+    const b = bancoSel();
+    const ver = b ? !!b.requiere_dni : conDni.length > 0;
+    docBox.classList.toggle('hidden', !ver);
+    const av = $('#docAviso');
+    if (b && b.requiere_dni) av.textContent = 'Obligatorio para simular en Banco ' + b.nombre + ': cargá frente y dorso del DNI.';
+    else if (!b && conDni.length) av.textContent = 'Para que también se simule en ' + nombresDni + ', cargá el DNI frente y dorso. Si no las cargás, ' + nombresDni + ' queda afuera.';
+  };
   $('#banco').onchange = actDoc; actDoc();
   [['fF','dF'],['fD','dD']].forEach(([i,d])=>{
     $('#'+i).onchange = e=>{
@@ -630,12 +639,18 @@ async function viewNueva(){
     const b = bancoSel(), reqDni = b && b.requiere_dni;
     const fF = $('#fF').files[0], fD = $('#fD').files[0];
     if (reqDni && (!fF || !fD)) return fail('Para '+b.nombre+' hay que adjuntar frente y dorso del DNI.');
+    if ((fF && !fD) || (!fF && fD)) return fail('Falta '+(fF?'el dorso':'el frente')+' del DNI. Cargá las dos fotos o ninguna.');
     if (!$('#cons').checked) return fail('Falta confirmar que el cliente autorizó la consulta.');
+    const subirDni = !!(fF && fD) && (!b || reqDni);
+    if (!b && conDni.length && !subirDni){
+      const ok = await confirmar('No cargaste las fotos del DNI. Sin ellas no se puede simular en ' + nombresDni + '. ¿Enviar igual?', 'Enviar sin DNI', 'Volver y cargarlas');
+      if (!ok){ docBox.scrollIntoView({ block:'center', behavior:'smooth' }); return; }
+    }
 
     busy(btn, true, 'Enviando…');
     try{
       let pF = null, pD = null;
-      if (reqDni){
+      if (subirDni){
         const sube = async (f, lado)=>{
           const ext = (f.name.split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'') || 'jpg';
           const path = S.user.id + '/' + Date.now() + '_' + dni + '_' + lado + '.' + ext;

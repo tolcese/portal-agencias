@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Portal Agencias v0.1.5</title>
+<title>Portal Agencias v0.1.6</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
@@ -146,7 +146,7 @@ h2{margin:0;font-size:17px;line-height:24px}
 'use strict';
 
 // ===================== CONFIG =====================
-const APP_VER = '0.1.5';
+const APP_VER = '0.1.6';
 const VER_KEY = 'portal';
 const SUPABASE_URL = 'https://unhirashjnabisxjnebf.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_rK8OeIsVb0J68Vf8OUcxRA_d8DSnSSI';
@@ -160,7 +160,8 @@ const ESTADOS = {nueva:'Nueva', en_analisis:'En análisis', respondida:'Respondi
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const app = document.getElementById('app');
 
-let S = { user:null, agencia:null, bancos:null, consultas:[], channel:null, recovery:false, filtro:{q:'',estado:''} };
+let S = { user:null, agencia:null, bancos:null, consultas:[], channel:null, recovery:false, filtro:{q:'',estado:''}, pag:1 };
+const POR_PAG = 5;
 
 // ===================== HELPERS =====================
 function esc(v){ return String(v==null?'':v).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -528,8 +529,8 @@ async function viewPanel(silencioso){
     + '<div id="lista"></div>';
   app.innerHTML = shell('#panel', html); bindShell();
   $('#bWa').onclick = abrirWhatsApp;
-  $('#q').oninput = e=>{ S.filtro.q = e.target.value; pintarLista(); };
-  $('#fe').onchange = e=>{ S.filtro.estado = e.target.value; pintarLista(); };
+  $('#q').oninput = e=>{ S.filtro.q = e.target.value; S.pag = 1; pintarLista(); };
+  $('#fe').onchange = e=>{ S.filtro.estado = e.target.value; S.pag = 1; pintarLista(); };
   pintarLista();
 }
 function pintarLista(){
@@ -545,15 +546,29 @@ function pintarLista(){
     return;
   }
   if (!rows.length){ box.innerHTML = '<div class="tbox"><div class="empty">Ninguna consulta coincide con la búsqueda.</div></div>'; return; }
+  const total = rows.length, paginas = Math.max(1, Math.ceil(total / POR_PAG));
+  if (S.pag > paginas) S.pag = paginas;
+  if (S.pag < 1) S.pag = 1;
+  const desde = (S.pag - 1) * POR_PAG;
+  const pagina = rows.slice(desde, desde + POR_PAG);
+  const pager = paginas > 1
+    ? '<div class="row between" style="margin-top:12px"><span class="muted" style="font-size:14px">Mostrando '+(desde+1)+'–'+(desde+pagina.length)+' de '+total+' consultas</span>'
+      + '<div class="row" style="gap:8px"><button class="btn btn-s" id="pgPrev"'+(S.pag<=1?' disabled':'')+'>‹ Anterior</button>'
+      + '<span style="font-size:14px;min-width:96px;text-align:center">Página '+S.pag+' de '+paginas+'</span>'
+      + '<button class="btn btn-s" id="pgNext"'+(S.pag>=paginas?' disabled':'')+'>Siguiente ›</button></div></div>'
+    : '<div class="muted" style="font-size:14px;margin-top:12px">'+total+(total===1?' consulta':' consultas')+'</div>';
   box.innerHTML = '<div class="tbox"><table class="t"><thead><tr><th>N°</th><th>Cliente</th><th>Vehículo</th><th>Monto</th><th>Cargada</th><th>Estado</th><th></th></tr></thead><tbody>'
-    + rows.map(x=>{
+    + pagina.map(x=>{
         const veh = [x.vehiculo_marca, x.vehiculo_modelo, x.vehiculo_condicion==='0km' ? '0km' : x.vehiculo_anio].filter(Boolean).join(' ');
         return '<tr class="click'+(x.estado==='respondida'?' hl':'')+'" data-id="'+x.id+'"><td>'+nro(x.id)+'</td>'
           + '<td><b>'+esc(x.cliente_nombre)+'</b><br><span class="muted">DNI '+esc(fmtDni(x.cliente_dni))+'</span></td>'
           + '<td>'+esc(veh||'—')+'</td><td>'+montoFin(x.monto_a_financiar)+'</td><td>'+fmtD(x.created_at)+'</td>'
           + '<td>'+badge(x.estado)+'</td><td><a href="#consulta/'+x.id+'">Ver</a></td></tr>';
       }).join('')
-    + '</tbody></table></div>';
+    + '</tbody></table></div>' + pager;
+  const pp = $('#pgPrev'), pn = $('#pgNext');
+  if (pp) pp.onclick = ()=>{ S.pag--; pintarLista(); };
+  if (pn) pn.onclick = ()=>{ S.pag++; pintarLista(); };
   $$('tr.click', box).forEach(tr=> tr.onclick = e=>{ if (e.target.tagName !== 'A') go('#consulta/'+tr.dataset.id); });
 }
 

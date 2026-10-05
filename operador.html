@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Operadores · Portal Agencias v0.2.1</title>
+<title>Operadores · Portal Agencias v0.2.2</title>
 <meta name="robots" content="noindex">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -174,7 +174,7 @@ h2{margin:0;font-size:17px;line-height:24px}
 'use strict';
 
 // ===================== CONFIG =====================
-const APP_VER = '0.2.1';
+const APP_VER = '0.2.2';
 const VER_KEY = 'operador';
 const SUPABASE_URL = 'https://unhirashjnabisxjnebf.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_rK8OeIsVb0J68Vf8OUcxRA_d8DSnSSI';
@@ -571,7 +571,7 @@ async function viewConsulta(id){
   app.innerHTML = shell('#bandeja', cargando('Cargando consulta…')); bindShell();
   const [rc, ro] = await Promise.all([
     sb.from('consultas').select('*, agencia:agencias(razon_social,provincia,responsable,telefono,email)').eq('id', id).maybeSingle(),
-    sb.from('ofertas').select('id,banco_id,resultado,monto_aprobado,vigencia_hasta,requisitos,cuotas:oferta_cuotas(id,plazo_meses,tipo_tasa,cuota),interna:ofertas_internas(motivo,comision_pct)').eq('consulta_id', id)
+    sb.from('ofertas').select('id,banco_id,resultado,monto_aprobado,monto_neto,vigencia_hasta,requisitos,cuotas:oferta_cuotas(id,plazo_meses,tipo_tasa,cuota),interna:ofertas_internas(motivo,comision_pct)').eq('consulta_id', id)
   ]);
   if (rc.error) return toast(errMsg(rc.error));
   const c = rc.data;
@@ -717,7 +717,7 @@ function soloLectura(){
     const banco = (S.bancos.find(x=>x.id===b.banco_id)||{}).nombre || '—';
     if (b.resultado==='rechazado') return '<article class="bank" style="flex-direction:row;justify-content:space-between;align-items:center;flex-wrap:wrap"><h3>'+esc(banco)+'</h3><span class="row"><span class="muted" style="font-size:13px">'+esc(b.motivo)+'</span><span class="b b-rechazado">Rechazado</span></span></article>';
     return '<article class="bank"><div class="row between"><h3>'+esc(banco)+'</h3><span class="b b-aprobado">Aprobado</span></div>'
-      + '<div class="row" style="gap:32px"><div class="kv"><span>Bruto (banco)</span><span class="big">'+esc(b.monto||'—')+'</span></div><div class="kv"><span>% comisión</span><span class="big">'+(b.pct?esc(b.pct)+' %':'—')+'</span></div><div class="kv"><span>Neto (cliente)</span><span class="big" style="color:var(--green)">'+money(b.neto)+'</span></div>'+(b.vigencia?'<div class="kv"><span>Vigente hasta</span><span class="big">'+esc(b.vigencia.split('-').reverse().join('/'))+'</span></div>':'')+'</div>'
+      + '<div class="row" style="gap:32px"><div class="kv"><span>Bruto (banco)</span><span class="big">'+esc(b.monto||'—')+'</span></div><div class="kv"><span>% comisión</span><span class="big">'+(b.pct?esc(b.pct)+' %':'—')+'</span></div><div class="kv"><span>Neto (cliente)</span><span class="big" style="color:var(--green)">'+money(b.neto!=null ? b.neto : netoDe(parseMoneda(b.monto), parsePct(b.pct)))+'</span></div>'+(b.vigencia?'<div class="kv"><span>Vigente hasta</span><span class="big">'+esc(b.vigencia.split('-').reverse().join('/'))+'</span></div>':'')+'</div>'
       + '<div style="border:1px solid var(--line2);border-radius:10px;overflow-x:auto"><table class="pt"><thead><tr><th>Plazo</th>'+(b.fija?'<th>Tasa fija</th>':'')+(b.uva?'<th>UVA · cuota inicial</th>':'')+'</tr></thead><tbody>'
       + b.filas.map(f=>'<tr><td><b>'+f.plazo+' cuotas</b></td>'+(b.fija?'<td>'+esc(f.fija||'—')+'</td>':'')+(b.uva?'<td>'+esc(f.uva||'—')+'</td>':'')+'</tr>').join('')
       + '</tbody></table></div>'+(b.requisitos?'<p style="margin:0;font-size:14px"><b>Requisitos:</b> '+esc(b.requisitos)+'</p>':'')+'</article>';

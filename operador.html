@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Operadores · Portal Agencias v0.2.3</title>
+<title>Operadores · Portal Agencias v0.3.0</title>
 <meta name="robots" content="noindex">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -174,7 +174,7 @@ h2{margin:0;font-size:17px;line-height:24px}
 'use strict';
 
 // ===================== CONFIG =====================
-const APP_VER = '0.2.3';
+const APP_VER = '0.3.0';
 const VER_KEY = 'operador';
 const SUPABASE_URL = 'https://unhirashjnabisxjnebf.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_rK8OeIsVb0J68Vf8OUcxRA_d8DSnSSI';
@@ -315,6 +315,7 @@ function route(){
   if (h.indexOf('#consulta/') === 0) return viewConsulta(Number(h.split('/')[1]));
   if (h === '#agencias') return viewAgencias();
   if (h === '#historial') return viewHistorial();
+  if (h === '#operadores') return viewOperadores();
   return viewBandeja();
 }
 
@@ -393,11 +394,11 @@ function shell(activo, contenido, cnt){
   cnt = cnt || {};
   const item = (h, t, n)=>'<a class="nav'+(activo===h?' on':'')+'" href="'+h+'">'+t+(n?'<span class="cnt">'+n+'</span>':'')+'</a>';
   return '<div class="shell"><nav class="side" aria-label="Menú"><div class="brand" style="padding-bottom:4px">Portal Agencias</div><div style="color:#A9B8D0;font-size:13px;padding:0 12px 20px">Panel operador</div>'
-    + item('#bandeja','Bandeja', cnt.nuevas) + item('#historial','Historial') + item('#agencias','Agencias', esAdmin() ? cnt.pend : 0)
-    + '<div class="side-foot"><span>'+esc(S.op.nombre)+' · '+esc(S.op.rol)+'</span><button id="bOut">Cerrar sesión</button><span style="opacity:.7">v'+APP_VER+'</span></div></nav>'
+    + item('#bandeja','Bandeja', cnt.nuevas) + item('#historial','Historial') + item('#agencias','Agencias', esAdmin() ? cnt.pend : 0) + (esAdmin() ? item('#operadores','Operadores') : '')
+    + '<div class="side-foot"><span>'+esc(S.op.nombre)+' · '+esc(S.op.rol)+'</span><button id="bPass">Cambiar contraseña</button><button id="bOut">Cerrar sesión</button><span style="opacity:.7">v'+APP_VER+'</span></div></nav>'
     + '<main class="main"><div class="wrap">'+contenido+'</div></main></div>';
 }
-function bindShell(){ const b = $('#bOut'); if (b) b.onclick = salir; }
+function bindShell(){ const b = $('#bOut'); if (b) b.onclick = salir; const p = $('#bPass'); if (p) p.onclick = cambiarClave; }
 const cargando = t=>'<div class="loading" style="min-height:40vh"><span class="spin"></span>'+(t||'Cargando…')+'</div>';
 
 // ===================== BANDEJA =====================
@@ -1008,6 +1009,119 @@ async function exportarHist(btn){
     XLSX.writeFile(wb, 'historial_'+S.hist.desde+'_a_'+S.hist.hasta+'.xlsx');
   } catch(e){ toast(errMsg(e)); }
   busy(btn, false);
+}
+
+// ===================== OPERADORES (admin) =====================
+function genPass(){
+  const abc = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+  const a = new Uint32Array(10); crypto.getRandomValues(a);
+  return Array.from(a, n=>abc[n % abc.length]).join('');
+}
+function ventana(html, onBind){
+  const ov = document.createElement('div'); ov.className = 'ov';
+  ov.innerHTML = '<div class="modal" role="dialog" aria-modal="true">'+html+'</div>';
+  document.body.appendChild(ov);
+  const cerrar = ()=>ov.remove();
+  ov.addEventListener('click', e=>{ if (e.target===ov) cerrar(); });
+  onBind && onBind(ov, cerrar);
+  return cerrar;
+}
+async function copiar(txt){
+  try { await navigator.clipboard.writeText(txt); toast('Copiado.'); }
+  catch(e){ toast('No se pudo copiar automáticamente. Seleccioná el texto y copiálo.'); }
+}
+
+async function viewOperadores(){
+  if (!esAdmin()) return go('#bandeja');
+  app.innerHTML = shell('#operadores', cargando('Cargando operadores…')); bindShell();
+  const { data, error } = await sb.from('operadores').select('*').order('created_at');
+  if (error){ toast(errMsg(error)); return; }
+  const lista = data || [];
+  S.ops = {}; lista.forEach(o=> S.ops[o.id] = o);
+  let html = '<h1>Operadores</h1>'
+    + '<section class="card"><h2 style="font-size:18px">Agregar operador</h2><div id="errOp" class="alert hidden"></div>'
+    + '<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">'
+    + '<div class="f"><label for="oNom">Nombre</label><input id="oNom" autocomplete="off"></div>'
+    + '<div class="f"><label for="oEm">Email</label><input id="oEm" type="email" autocomplete="off"></div>'
+    + '<div class="f"><label for="oRol">Rol</label><select id="oRol"><option value="operador">Operador</option><option value="admin">Admin</option></select></div>'
+    + '</div><div class="row between"><span class="muted" style="font-size:13px">Se genera una contraseña temporal para que se la pases. Después la cambia desde su panel.</span><button class="btn btn-b" id="bCrear">Crear operador</button></div></section>'
+    + '<div class="tbox"><table class="t"><thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Estado</th><th>Alta</th><th></th></tr></thead><tbody>'
+    + lista.map(o=>{
+      const yo = o.id === S.user.id;
+      const acc = yo ? '<span class="muted" style="font-size:13px">Sos vos</span>'
+        : '<div class="row" style="gap:6px"><button class="btn btn-s btn-sm" data-rol="'+o.id+'">'+(o.rol==='admin'?'Pasar a operador':'Hacer admin')+'</button>'
+          + '<button class="btn btn-s btn-sm" data-act="'+o.id+'">'+(o.activo?'Desactivar':'Reactivar')+'</button></div>';
+      return '<tr><td><b>'+esc(o.nombre)+'</b></td><td>'+esc(o.email||'—')+'</td>'
+        + '<td><span class="b '+(o.rol==='admin'?'b-en_analisis':'b-nueva')+'">'+(o.rol==='admin'?'Admin':'Operador')+'</span></td>'
+        + '<td><span class="b '+(o.activo?'b-aprobado':'b-rechazado')+'">'+(o.activo?'Activo':'Inactivo')+'</span></td>'
+        + '<td>'+fmtD(o.created_at)+'</td><td>'+acc+'</td></tr>';
+    }).join('') + '</tbody></table></div>';
+  app.innerHTML = shell('#operadores', html); bindShell();
+
+  $('#bCrear').onclick = async e=>{
+    const btn = e.currentTarget, er = $('#errOp');
+    er.classList.add('hidden');
+    const nombre = $('#oNom').value.trim(), email = $('#oEm').value.trim().toLowerCase(), rol = $('#oRol').value;
+    const fail = m=>{ er.textContent = m; er.classList.remove('hidden'); };
+    if (!nombre) return fail('Falta el nombre.');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return fail('El email no es válido.');
+    const password = genPass();
+    busy(btn, true, 'Creando…');
+    const { data: r, error } = await sb.functions.invoke('crear-operador', { body:{ nombre, email, rol, password } });
+    busy(btn, false);
+    if (error){
+      let m = error.message;
+      try { const j = await error.context.json(); if (j && j.error) m = j.error; } catch(_){}
+      if (/Failed to send|fetch|not found|404/i.test(m)) m = 'No se pudo contactar la función "crear-operador". ¿Está desplegada en Supabase?';
+      return fail(m);
+    }
+    if (r && r.error) return fail(r.error);
+    const link = location.origin + location.pathname;
+    const texto = 'Hola '+nombre+', ya tenés acceso al panel de operadores.\nIngresá en: '+link+'\nUsuario: '+email+'\nContraseña temporal: '+password+'\nAl entrar, cambiala desde "Cambiar contraseña".';
+    ventana('<h2 style="font-size:20px">Operador creado</h2><p>Pasale estos datos a <b>'+esc(nombre)+'</b>. La contraseña no se vuelve a mostrar.</p>'
+      + '<div style="background:var(--bg);border-radius:10px;padding:14px;font-size:14px;line-height:22px;display:flex;flex-direction:column;gap:4px">'
+      + '<div><span class="muted">Ingreso:</span> '+esc(link)+'</div><div><span class="muted">Usuario:</span> <b>'+esc(email)+'</b></div><div><span class="muted">Contraseña temporal:</span> <b style="font-family:ui-monospace,Consolas,monospace;font-size:16px">'+esc(password)+'</b></div></div>'
+      + '<div class="row" style="justify-content:flex-end"><button class="btn btn-s" data-copy>Copiar mensaje</button><button class="btn btn-b" data-ok>Listo</button></div>',
+      (ov, cerrar)=>{ $('[data-copy]', ov).onclick = ()=>copiar(texto); $('[data-ok]', ov).onclick = ()=>{ cerrar(); viewOperadores(); }; });
+  };
+  $$('[data-act]').forEach(b=> b.onclick = async ()=>{
+    const o = S.ops[b.dataset.act];
+    const txt = o.activo ? '¿Desactivar a '+o.nombre+'? No va a poder entrar al panel. Sus consultas quedan registradas.' : '¿Reactivar a '+o.nombre+'?';
+    if (await modal(txt, o.activo ? 'Desactivar' : 'Reactivar') === null) return;
+    const { error } = await sb.from('operadores').update({ activo: !o.activo }).eq('id', o.id);
+    if (error) return toast(errMsg(error));
+    toast(o.nombre + (o.activo ? ' desactivado.' : ' reactivado.')); viewOperadores();
+  });
+  $$('[data-rol]').forEach(b=> b.onclick = async ()=>{
+    const o = S.ops[b.dataset.rol], nuevo = o.rol === 'admin' ? 'operador' : 'admin';
+    const txt = nuevo === 'admin' ? '¿Hacer admin a '+o.nombre+'? Va a poder aprobar agencias, gestionar operadores y editar cualquier consulta.' : '¿Pasar a '+o.nombre+' a operador común?';
+    if (await modal(txt, 'Confirmar') === null) return;
+    const { error } = await sb.from('operadores').update({ rol: nuevo }).eq('id', o.id);
+    if (error) return toast(errMsg(error));
+    toast('Rol actualizado.'); viewOperadores();
+  });
+}
+
+function cambiarClave(){
+  ventana('<h2 style="font-size:20px">Cambiar contraseña</h2><div class="alert hidden" data-err></div>'
+    + '<div class="f"><label for="nc1">Contraseña nueva</label><input id="nc1" type="password" autocomplete="new-password"><span class="help">Mínimo 8 caracteres.</span></div>'
+    + '<div class="f"><label for="nc2">Repetir contraseña</label><input id="nc2" type="password" autocomplete="new-password"></div>'
+    + '<div class="row" style="justify-content:flex-end"><button class="btn btn-s" data-no>Cancelar</button><button class="btn btn-b" data-si>Guardar</button></div>',
+    (ov, cerrar)=>{
+      $('#nc1', ov).focus();
+      $('[data-no]', ov).onclick = cerrar;
+      $('[data-si]', ov).onclick = async e=>{
+        const er = $('[data-err]', ov), p1 = $('#nc1', ov).value, p2 = $('#nc2', ov).value;
+        er.classList.add('hidden');
+        if (p1.length < 8){ er.textContent = 'La contraseña debe tener al menos 8 caracteres.'; return er.classList.remove('hidden'); }
+        if (p1 !== p2){ er.textContent = 'Las contraseñas no coinciden.'; return er.classList.remove('hidden'); }
+        busy(e.currentTarget, true);
+        const { error } = await sb.auth.updateUser({ password:p1 });
+        busy(e.currentTarget, false);
+        if (error){ er.textContent = errMsg(error); return er.classList.remove('hidden'); }
+        cerrar(); toast('Contraseña actualizada.');
+      };
+    });
 }
 
 window.addEventListener('beforeunload', e=>{ if (S.ed && S.ed.sucio && S.ed.editable){ e.preventDefault(); e.returnValue=''; } });

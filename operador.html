@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Operadores · Portal Agencias v0.2.0</title>
+<title>Operadores · Portal Agencias v0.2.1</title>
 <meta name="robots" content="noindex">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -174,7 +174,8 @@ h2{margin:0;font-size:17px;line-height:24px}
 'use strict';
 
 // ===================== CONFIG =====================
-const APP_VER = '0.2.0';
+const APP_VER = '0.2.1';
+const VER_KEY = 'operador';
 const SUPABASE_URL = 'https://unhirashjnabisxjnebf.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_rK8OeIsVb0J68Vf8OUcxRA_d8DSnSSI';
 window.OPERADOR_VER = APP_VER;
@@ -267,6 +268,42 @@ function busy(btn, on, txt){
   else { btn.disabled = false; if (btn.dataset.t) btn.innerHTML = btn.dataset.t; }
 }
 const ICON_LOCK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
+
+// ===================== AUTO-ACTUALIZACIÓN =====================
+async function recargarFresco(){
+  try { await fetch(location.href.split('#')[0], { cache:'reload' }); } catch(e){}
+  location.reload();
+}
+function bannerUpdate(nueva){
+  if (document.getElementById('updBar')) return;
+  const d = document.createElement('div');
+  d.id = 'updBar';
+  d.setAttribute('role','status');
+  d.style.cssText = 'position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:1001;background:#16202E;color:#fff;padding:12px 14px 12px 18px;border-radius:12px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;box-shadow:0 8px 28px rgba(22,32,46,.3);max-width:92vw;font-size:14px';
+  d.innerHTML = '<span>Hay una versión nueva (v'+esc(nueva)+')</span><button type="button" style="min-height:36px;padding:0 14px;border:0;border-radius:8px;background:#C2501C;color:#fff;font-weight:600;cursor:pointer">Actualizar</button>';
+  d.querySelector('button').onclick = recargarFresco;
+  document.body.appendChild(d);
+}
+async function chequearVersion(inicio){
+  try{
+    const r = await fetch('version.json?t=' + Date.now(), { cache:'no-store' });
+    if (!r.ok) return;
+    const v = await r.json();
+    const nueva = v[VER_KEY];
+    if (!nueva || nueva === APP_VER) return;
+    const marca = 'upd_' + VER_KEY + '_' + nueva;
+    let yaIntento = false;
+    try { yaIntento = sessionStorage.getItem(marca) === '1'; } catch(e){}
+    if (inicio && !yaIntento){
+      try { sessionStorage.setItem(marca, '1'); } catch(e){}
+      return recargarFresco();
+    }
+    bannerUpdate(nueva);
+  } catch(e){}
+}
+chequearVersion(true);
+setInterval(()=>chequearVersion(false), 3*60*1000);
+document.addEventListener('visibilitychange', ()=>{ if (document.visibilityState === 'visible') chequearVersion(false); });
 
 // ===================== ROUTER =====================
 function go(hash){ if (location.hash === hash) route(); else location.hash = hash; }

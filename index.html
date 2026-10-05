@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Portal Agencias v0.1.2</title>
+<title>Portal Agencias v0.1.3</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
@@ -146,7 +146,7 @@ h2{margin:0;font-size:17px;line-height:24px}
 'use strict';
 
 // ===================== CONFIG =====================
-const APP_VER = '0.1.2';
+const APP_VER = '0.1.3';
 const SUPABASE_URL = 'https://unhirashjnabisxjnebf.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_rK8OeIsVb0J68Vf8OUcxRA_d8DSnSSI';
 const WHATSAPP_NUM = ''; // ej: '5493511234567' — pendiente de configurar
@@ -542,7 +542,7 @@ async function viewNueva(){
    + '<div class="f"><label for="valor">Valor del vehículo</label><input id="valor" class="money" inputmode="decimal" placeholder="$ 0"></div>'
    + '</div></section>'
    + '<section class="card"><h2>Financiación</h2><div class="grid">'
-   + '<div class="f"><label for="monto">Monto a financiar</label><input id="monto" class="money" inputmode="decimal" placeholder="$ 0"><span class="help">Completar en caso de solicitar un monto específico. Si queda vacío, se simula por el máximo que le den al cliente.</span></div>'
+   + '<div class="f"><label for="monto">Monto que necesita el cliente</label><input id="monto" class="money" inputmode="decimal" placeholder="$ 0"><span class="help">Completar si el cliente necesita un monto específico (lo que le tiene que quedar). Si queda vacío, se simula por el máximo que le den.</span></div>'
    + '<div class="f"><label for="plazo">Plazo deseado</label><select id="plazo"><option value="">Indistinto (máximo posible)</option>'+PLAZOS.map(p=>'<option value="'+p+'">'+p+' meses</option>').join('')+'</select></div>'
    + '<div class="f"><label for="banco">Banco preferido</label><select id="banco"><option value="">Todos</option>'+bancos.map(b=>'<option value="'+b.id+'">'+esc(b.nombre)+'</option>').join('')+'</select></div>'
    + '</div></section>'
@@ -583,7 +583,7 @@ async function viewNueva(){
     if (dni.length < 7 || dni.length > 8){ falt.push('dni'); msgs.push('el DNI tiene que tener 7 u 8 números'); }
     if (!v('nom')){ falt.push('nom'); msgs.push('falta el nombre y apellido'); }
     let monto = parseMoneda(v('monto'));
-    if (monto !== null && monto < 0){ falt.push('monto'); msgs.push('el monto a financiar no puede ser negativo'); }
+    if (monto !== null && monto < 0){ falt.push('monto'); msgs.push('el monto no puede ser negativo'); }
     if (!monto) monto = null;
     if (falt.length){ const m = msgs.join('; '); return fail(m.charAt(0).toUpperCase() + m.slice(1) + '.', falt); }
     const anio = v('anio') ? Number(v('anio')) : null;
@@ -635,7 +635,7 @@ async function viewDetalle(id, silencioso){
   if (!silencioso){ app.innerHTML = shell('#panel', '<div class="loading" style="min-height:40vh"><span class="spin"></span>Cargando consulta…</div>'); bindShell(); }
   const [rc, ro] = await Promise.all([
     sb.from('consultas').select('*, banco:bancos(nombre)').eq('id', id).maybeSingle(),
-    sb.from('ofertas').select('id,resultado,monto_aprobado,vigencia_hasta,requisitos,banco_id,banco:bancos(nombre,admite_uva,orden),cuotas:oferta_cuotas(id,plazo_meses,tipo_tasa,cuota)').eq('consulta_id', id)
+    sb.from('ofertas').select('id,resultado,monto_aprobado,monto_neto,vigencia_hasta,requisitos,banco_id,banco:bancos(nombre,admite_uva,orden),cuotas:oferta_cuotas(id,plazo_meses,tipo_tasa,cuota)').eq('consulta_id', id)
   ]);
   if (rc.error){ toast(errMsg(rc.error)); return; }
   const c = rc.data;
@@ -648,7 +648,7 @@ async function viewDetalle(id, silencioso){
   const veh = [c.vehiculo_marca, c.vehiculo_modelo, c.vehiculo_condicion==='0km' ? '0km' : c.vehiculo_anio].filter(Boolean).join(' ') || '—';
   const kv = (k, val)=>'<div class="kv"><span>'+k+'</span><span>'+val+'</span></div>';
   const resumen = '<section class="card" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:20px">'
-    + kv('DNI', esc(fmtDni(c.cliente_dni))) + kv('Vehículo', esc(veh)) + kv('Monto a financiar', montoFin(c.monto_a_financiar))
+    + kv('DNI', esc(fmtDni(c.cliente_dni))) + kv('Vehículo', esc(veh)) + kv('Monto pedido', montoFin(c.monto_a_financiar))
     + kv('Plazo deseado', c.plazo_deseado ? c.plazo_deseado+' meses' : 'Indistinto')
     + kv('Banco', c.banco ? esc(c.banco.nombre) : 'Todos') + kv('Cargada', fmtD(c.created_at,true)) + '</section>';
 
@@ -693,7 +693,8 @@ async function viewDetalle(id, silencioso){
         return '<td'+(sel?' class="sel"':'')+'><label><input type="radio" name="op" value="'+q.id+'" data-desc="'+esc(lbl)+'" aria-label="'+esc(lbl)+'"'+(sel?' checked':'')+(puedeElegir?'':' disabled')+'><span>'+money(q.cuota)+'</span></label></td>';
       };
       return '<article class="bank'+(tieneAcept?' pick':'')+'"><div class="row between"><h3>Banco '+esc(nombre)+'</h3><span class="b b-aprobado">Aprobado</span></div>'
-        + '<div class="row" style="gap:32px"><div class="kv"><span>Monto aprobado</span><span class="big">'+money(o.monto_aprobado)+'</span></div>'
+        + '<div class="row" style="gap:32px"><div class="kv"><span>Le queda al cliente</span><span class="big" style="color:var(--green)">'+money(o.monto_neto!=null?o.monto_neto:o.monto_aprobado)+'</span></div>'
+        + '<div class="kv"><span>Monto aprobado por el banco</span><span class="big">'+money(o.monto_aprobado)+'</span></div>'
         + (o.vigencia_hasta ? '<div class="kv"><span>Vigente hasta</span><span class="big">'+fmtFecha(o.vigencia_hasta).slice(0,5)+'</span></div>' : '')
         + '<div class="kv"><span>Tasa</span><span class="big">'+tasaTxt+'</span></div></div>'
         + (plazos.length ? '<div style="border:1px solid var(--line2);border-radius:10px;overflow-x:auto"><table class="pt"><thead><tr><th>Plazo</th>'+tipos.map(t=>'<th>'+(t==='uva'?'UVA · cuota inicial':'Tasa fija')+'</th>').join('')+'</tr></thead><tbody>'

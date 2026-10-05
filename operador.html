@@ -1,0 +1,820 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Operadores · Portal Agencias v0.1.0</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+:root{
+  --ink:#16202E; --muted:#5A6170; --line:#DCDAD3; --line2:#ECEAE4; --field:#CFCCC3;
+  --bg:#F4F3EF; --card:#FFFFFF; --nav:#16202E; --nav2:#2B3B57; --navtxt:#C9CED8;
+  --accent:#C2501C; --accent2:#A8431573; --blue:#1F4E8C; --green:#1C5E3A; --wa:#1E7A4A;
+  --b-n-bg:#ECEBE6; --b-n:#3D4350; --b-a-bg:#E3ECF8; --b-a:#1F4E8C; --b-r-bg:#FBE7DC; --b-r:#9A3D12;
+  --b-ok-bg:#DFF0E6; --b-ok:#1C5E3A; --b-x-bg:#EEEEEE; --b-x:#4A4A4A;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font-family:'IBM Plex Sans','Segoe UI',system-ui,-apple-system,sans-serif;font-size:15px;line-height:1.45;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+a{color:var(--blue)} a:hover{color:#163A69}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid #7FA6DC;outline-offset:2px}
+h1{margin:0;font-size:28px;line-height:36px}
+h2{margin:0;font-size:17px;line-height:24px}
+.muted{color:var(--muted)}
+.hidden{display:none!important}
+
+/* layout */
+.shell{display:flex;flex-wrap:wrap;min-height:100vh}
+.side{flex:1 1 220px;max-width:260px;background:var(--nav);padding:24px 16px;display:flex;flex-direction:column;gap:4px}
+.brand{color:#fff;font-weight:700;font-size:17px;padding:0 12px 20px}
+.nav{display:flex;align-items:center;min-height:44px;padding:0 12px;border-radius:8px;color:var(--navtxt);text-decoration:none;font-size:15px;background:none;border:0;text-align:left;cursor:pointer;width:100%}
+.nav:hover{color:#fff;background:#24324A}
+.nav.on{background:var(--nav2);color:#fff;font-weight:600}
+.side-foot{margin-top:auto;padding:20px 12px 0;border-top:1px solid var(--nav2);color:var(--navtxt);font-size:13px;line-height:18px;display:flex;flex-direction:column;gap:10px}
+.side-foot button{background:none;border:0;color:#fff;text-decoration:underline;cursor:pointer;padding:0;text-align:left;font-size:13px}
+.main{flex:999 1 560px;min-width:0;padding:32px 40px;display:flex;flex-direction:column;gap:24px}
+.wrap{max-width:1100px;width:100%;display:flex;flex-direction:column;gap:24px}
+@media (max-width:760px){
+  .side{max-width:none;flex-basis:100%;flex-direction:row;flex-wrap:wrap;align-items:center;padding:12px}
+  .brand{padding:0 8px;flex-basis:100%}
+  .nav{width:auto}
+  .side-foot{margin:0;border:0;padding:0 8px;flex-basis:100%;flex-direction:row;justify-content:space-between}
+  .main{padding:20px 16px}
+}
+
+/* components */
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:24px;display:flex;flex-direction:column;gap:16px}
+.grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.f{display:flex;flex-direction:column;gap:6px;min-width:0}
+.f label,.lbl{font-size:13px;font-weight:600;color:#3D4350}
+.f input,.f select,.f textarea{min-height:44px;border:1px solid var(--field);border-radius:8px;padding:0 12px;font-size:15px;background:#fff;width:100%}
+.f textarea{padding:10px 12px;min-height:88px;resize:vertical}
+.f .help{font-size:13px;line-height:18px;color:var(--muted)}
+.f.err input,.f.err select{border-color:#B3261E}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 18px;border-radius:8px;font-weight:600;font-size:15px;text-decoration:none;border:1px solid transparent;cursor:pointer;background:#fff}
+.btn[disabled]{opacity:.55;cursor:default}
+.btn-p{background:var(--accent);color:#fff}
+.btn-p:hover:not([disabled]){background:#A84315;color:#fff}
+.btn-s{border-color:var(--field);color:var(--ink)}
+.btn-s:hover:not([disabled]){background:#F7F6F2}
+.btn-wa{border-color:var(--wa);color:var(--wa)}
+.btn-wa:hover{background:#EEF7F1;color:var(--wa)}
+.btn-link{background:none;border:0;color:var(--blue);text-decoration:underline;cursor:pointer;padding:0;font-size:14px}
+.row{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.between{justify-content:space-between}
+.b{display:inline-block;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+.b-nueva{background:var(--b-n-bg);color:var(--b-n)}
+.b-en_analisis{background:var(--b-a-bg);color:var(--b-a)}
+.b-respondida{background:var(--b-r-bg);color:var(--b-r)}
+.b-aceptada,.b-aprobado{background:var(--b-ok-bg);color:var(--b-ok)}
+.b-desistida,.b-cerrada,.b-rechazado{background:var(--b-x-bg);color:var(--b-x)}
+.note{display:flex;gap:12px;padding:14px 16px;background:#fff;border:1px solid var(--line);border-radius:10px;font-size:14px;line-height:20px;color:#3D4350}
+.alert{padding:12px 14px;border-radius:8px;font-size:14px;line-height:20px;background:#FDECEA;color:#8C1D18;border:1px solid #F3C2BE}
+.ok{background:#EAF5EE;color:var(--green);border-color:#BFE0CB}
+.kv{display:flex;flex-direction:column;gap:2px}
+.kv>span:first-child{font-size:12px;color:var(--muted);font-weight:600}
+.tiles{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+.tile{background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px 20px;display:flex;flex-direction:column;gap:6px}
+.tile span:first-child{font-size:13px;color:var(--muted);font-weight:600}
+.tile span:last-child{font-size:30px;font-weight:700;line-height:1.1}
+
+.tbox{background:#fff;border:1px solid var(--line);border-radius:12px;overflow-x:auto}
+.t{width:100%;border-collapse:collapse;font-size:14px;min-width:720px}
+.t th{text-align:left;font-size:12px;color:var(--muted);padding:12px 16px;border-bottom:1px solid var(--line);font-weight:600}
+.t td{padding:14px 16px;border-bottom:1px solid var(--line2);vertical-align:middle}
+.t tr:last-child td{border-bottom:0}
+.t tr.hl{background:#FFF8F3}
+.t tr.click{cursor:pointer}
+.t tr.click:hover{background:#FAF9F6}
+.empty{padding:40px 20px;text-align:center;color:var(--muted);display:flex;flex-direction:column;gap:12px;align-items:center}
+
+.pt{width:100%;border-collapse:collapse;font-size:15px;min-width:380px}
+.pt th{text-align:left;font-size:12px;color:var(--muted);padding:10px 12px;border-bottom:1px solid var(--line);font-weight:600}
+.pt td{padding:10px 12px;border-bottom:1px solid var(--line2)}
+.pt tr:last-child td{border-bottom:0}
+.pt td.sel{background:#FFF4EC}
+.pt label{display:flex;align-items:center;gap:10px;cursor:pointer}
+.pt input{width:18px;height:18px;margin:0;accent-color:var(--accent)}
+.bank{background:#fff;border:1px solid var(--line);border-radius:12px;padding:20px 24px;display:flex;flex-direction:column;gap:14px}
+.bank.pick{border:2px solid var(--accent)}
+.bank h3{margin:0;font-size:18px}
+.big{font-size:20px;font-weight:700}
+.bar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:16px 20px;background:var(--nav);color:#fff;border-radius:12px;position:sticky;bottom:12px}
+.bar .btn-s{background:transparent;color:#fff;border-color:#4A5A75}
+.tl{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:16px;font-size:14px;line-height:20px}
+.tl li{display:flex;gap:12px}
+.dot{width:12px;height:12px;border-radius:50%;margin-top:4px;flex:none}
+
+.drop{min-height:120px;border:2px dashed var(--field);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:#3D4350;font-size:14px;cursor:pointer;background:#FAFAF8;text-align:center;padding:12px}
+.drop.done{border-color:var(--green);background:#F3FAF6}
+.drop input{display:none}
+
+/* auth */
+.auth{display:flex;flex-wrap:wrap;min-height:100vh}
+.auth-side{flex:1 1 340px;background:var(--nav);color:#fff;padding:56px 48px;display:flex;flex-direction:column;gap:32px}
+.auth-side h1{font-size:36px;line-height:44px}
+.auth-side p{margin:0;font-size:16px;line-height:26px;color:var(--navtxt)}
+.checks{display:flex;flex-direction:column;gap:14px;font-size:15px;color:#E4E7ED}
+.checks div{display:flex;gap:12px;align-items:flex-start}
+.checks svg{flex:none}
+.auth-main{flex:999 1 520px;min-width:0;padding:56px 48px;display:flex;justify-content:center}
+.auth-form{width:100%;max-width:640px;display:flex;flex-direction:column;gap:20px}
+.center{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:48px 20px}
+.box{width:100%;max-width:520px;background:#fff;border:1px solid var(--line);border-radius:16px;padding:40px;display:flex;flex-direction:column;gap:18px;align-items:center;text-align:center}
+@media (max-width:760px){.auth-side,.auth-main{padding:32px 20px}.auth-side h1{font-size:28px;line-height:36px}.box{padding:28px 20px}}
+
+/* toast + modal */
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:12px 18px;border-radius:10px;font-size:14px;z-index:1000;max-width:90vw;box-shadow:0 6px 24px rgba(22,32,46,.25)}
+.ov{position:fixed;inset:0;background:rgba(22,32,46,.45);display:flex;align-items:center;justify-content:center;padding:20px;z-index:999}
+.modal{background:#fff;border-radius:14px;padding:24px;max-width:440px;width:100%;display:flex;flex-direction:column;gap:16px}
+.modal p{margin:0;line-height:22px}
+.spin{display:inline-block;width:18px;height:18px;border:2px solid #C9CED8;border-top-color:var(--blue);border-radius:50%;animation:sp .8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation-duration:2s}}
+.loading{min-height:100vh;display:flex;align-items:center;justify-content:center;gap:12px;color:var(--muted)}
+
+:root{--nav:#102A4C;--nav2:#24497D;--navtxt:#C9CED8}
+.nav:hover{background:#1B3A66}
+.nav .cnt{margin-left:auto;background:var(--accent);color:#fff;border-radius:999px;padding:1px 8px;font-size:12px;font-weight:600}
+.btn-b{background:var(--blue);color:#fff}
+.btn-b:hover:not([disabled]){background:#163A69;color:#fff}
+.btn-sm{min-height:36px;padding:0 14px;font-size:14px}
+.ghost{display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:0 14px;border:1px dashed #9AA3B2;border-radius:8px;background:transparent;color:var(--blue);font-weight:600;font-size:14px;cursor:pointer}
+.ghost:hover{background:#EEF3FA}
+.pend{display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between;padding:14px 16px;background:#FFF8F3;border:1px solid #F1D5C4;border-radius:10px}
+.lock{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
+.live{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--green)}
+.live i{width:8px;height:8px;border-radius:50%;background:var(--green)}
+.seg{display:flex;gap:8px;flex-wrap:wrap}
+.seg button{min-height:40px;padding:0 16px;border:1px solid var(--field);border-radius:8px;background:#fff;font-weight:600;font-size:14px;cursor:pointer}
+.seg button.on-ok{background:var(--green);border-color:var(--green);color:#fff}
+.seg button.on-no{background:#4A4A4A;border-color:#4A4A4A;color:#fff}
+.in{min-height:40px;border:1px solid var(--field);border-radius:8px;padding:0 10px;font-size:15px;background:#fff}
+.in:disabled{background:#F2F1ED;color:#8A8F99}
+.ptab{border-collapse:collapse;font-size:14px}
+.ptab th{text-align:left;font-size:12px;color:var(--muted);padding:8px 8px 8px 0;font-weight:600}
+.ptab td{padding:4px 8px 4px 0}
+.x{width:36px;height:36px;border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:18px;border-radius:8px}
+.x:hover{background:#F2F1ED;color:var(--ink)}
+.chk{display:inline-flex;align-items:center;gap:8px;font-size:15px}
+.chk input{width:18px;height:18px;margin:0;accent-color:var(--blue)}
+.chk.dis{color:#8A8F99}
+.banner{padding:12px 16px;border-radius:10px;background:#E3ECF8;color:var(--blue);font-size:14px;line-height:20px;border:1px solid #C7D7EE}
+</style>
+</head>
+<body>
+<div id="app"><div class="loading"><span class="spin"></span>Cargando…</div></div>
+<script>
+(function(){
+'use strict';
+
+// ===================== CONFIG =====================
+const APP_VER = '0.1.0';
+const SUPABASE_URL = 'https://unhirashjnabisxjnebf.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_rK8OeIsVb0J68Vf8OUcxRA_d8DSnSSI';
+window.OPERADOR_VER = APP_VER;
+
+const PLAZOS = [12,18,24,36,48,60];
+const ESTADOS = {nueva:'Nueva', en_analisis:'En análisis', respondida:'Respondida', aceptada:'Aceptada', desistida:'Desistida', cerrada:'Cerrada'};
+const EST_AG = {pendiente:'Pendiente', aprobada:'Aprobada', rechazada:'Rechazada', suspendida:'Suspendida'};
+
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const app = document.getElementById('app');
+
+let S = { user:null, op:null, ops:{}, bancos:[], consultas:[], agencias:[], channel:null,
+  filtro:{ vista:'activas', agencia:'' }, agFiltro:'pendiente', ed:null, reloadT:null };
+
+// ===================== HELPERS =====================
+function esc(v){ return String(v==null?'':v).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+const nf = new Intl.NumberFormat('es-AR');
+function money(n){ return (n==null||n==='') ? '—' : '$ ' + nf.format(Math.round(Number(n))); }
+function montoFin(n){ return (n==null||Number(n)===0) ? 'Máximo disponible' : money(n); }
+function parseMoneda(s){
+  if (s==null) return null;
+  let t = String(s).replace(/[^\d,.-]/g,'').trim();
+  if (!t) return null;
+  t = t.replace(/\./g,'').replace(',', '.');
+  const n = Number(t);
+  return isFinite(n) ? n : null;
+}
+function fmtMonedaInput(el){ const n = parseMoneda(el.value); el.value = n==null ? '' : '$ ' + nf.format(n); }
+function fmtD(d, conHora){
+  if (!d) return '—';
+  const x = new Date(d);
+  let s = String(x.getDate()).padStart(2,'0') + '/' + String(x.getMonth()+1).padStart(2,'0');
+  if (conHora) s += ' ' + String(x.getHours()).padStart(2,'0') + ':' + String(x.getMinutes()).padStart(2,'0');
+  return s;
+}
+function soloDigitos(s){ return String(s||'').replace(/\D/g,''); }
+function fmtCuit(s){ const d = soloDigitos(s); return d.length===11 ? d.slice(0,2)+'-'+d.slice(2,10)+'-'+d.slice(10) : (s||''); }
+function fmtDni(s){ const d = soloDigitos(s); return d ? nf.format(Number(d)) : ''; }
+function nro(id){ return String(id).padStart(4,'0'); }
+function dur(ms){
+  if (ms == null || ms < 0) return '—';
+  const m = Math.round(ms/60000);
+  if (m < 60) return m + ' min';
+  const h = Math.floor(m/60);
+  if (h < 24) return h + ' h' + (m%60 && h < 6 ? ' ' + (m%60) + ' min' : '');
+  const d = Math.floor(h/24);
+  return d + (d===1 ? ' día' : ' días');
+}
+function badge(e, extra){ return '<span class="b b-'+esc(e)+'">'+esc(ESTADOS[e]||e)+(extra?' · '+esc(extra):'')+'</span>'; }
+const $ = (sel, root) => (root||document).querySelector(sel);
+const $$ = (sel, root) => Array.from((root||document).querySelectorAll(sel));
+const esAdmin = ()=> S.op && S.op.rol === 'admin';
+const opNombre = id => (S.ops[id] && S.ops[id].nombre) || 'otro operador';
+
+let toastT;
+function toast(msg){
+  let t = document.getElementById('toast');
+  if (!t){ t = document.createElement('div'); t.id='toast'; t.setAttribute('role','status'); document.body.appendChild(t); }
+  t.textContent = msg; t.classList.remove('hidden');
+  clearTimeout(toastT); toastT = setTimeout(()=>t.classList.add('hidden'), 4500);
+}
+function modal(texto, okTxt, conCampo){
+  return new Promise(res=>{
+    const ov = document.createElement('div'); ov.className='ov';
+    ov.innerHTML = '<div class="modal" role="dialog" aria-modal="true"><p>'+esc(texto)+'</p>'
+      + (conCampo ? '<div class="f"><label for="mIn">'+esc(conCampo)+'</label><input id="mIn"></div>' : '')
+      + '<div class="row" style="justify-content:flex-end"><button class="btn btn-s" data-r="0">Cancelar</button><button class="btn btn-b" data-r="1">'+esc(okTxt||'Confirmar')+'</button></div></div>';
+    document.body.appendChild(ov);
+    const fin = ok=>{ const v = conCampo ? $('#mIn', ov).value.trim() : true; ov.remove(); res(ok ? v : null); };
+    ov.addEventListener('click', e=>{
+      const r = e.target.getAttribute && e.target.getAttribute('data-r');
+      if (r !== null) fin(r==='1'); else if (e.target===ov) fin(false);
+    });
+    (conCampo ? $('#mIn', ov) : $('[data-r="1"]', ov)).focus();
+  });
+}
+function errMsg(e){
+  const m = (e && (e.message||e.error_description)) || String(e);
+  if (/Invalid login credentials/i.test(m)) return 'Email o contraseña incorrectos.';
+  if (/Email not confirmed/i.test(m)) return 'El email todavía no está confirmado.';
+  if (/rate limit|too many/i.test(m)) return 'Demasiados intentos. Esperá unos minutos.';
+  return m;
+}
+function busy(btn, on, txt){
+  if (!btn) return;
+  if (on){ btn.dataset.t = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spin"></span>' + (txt||''); }
+  else { btn.disabled = false; if (btn.dataset.t) btn.innerHTML = btn.dataset.t; }
+}
+const ICON_LOCK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
+
+// ===================== ROUTER =====================
+function go(hash){ if (location.hash === hash) route(); else location.hash = hash; }
+window.addEventListener('hashchange', route);
+function route(){
+  const h = location.hash || '';
+  if (!S.user) return viewLogin();
+  if (!S.op) return viewNoOp();
+  if (h.indexOf('#consulta/') === 0) return viewConsulta(Number(h.split('/')[1]));
+  if (h === '#agencias') return viewAgencias();
+  return viewBandeja();
+}
+
+// ===================== SESSION =====================
+async function iniciar(session){
+  S.user = session ? session.user : null; S.op = null;
+  if (S.channel){ sb.removeChannel(S.channel); S.channel = null; }
+  if (S.user){
+    const r = await sb.from('operadores').select('*').eq('id', S.user.id).maybeSingle();
+    if (r.data && r.data.activo){
+      S.op = r.data;
+      const [ro, rb] = await Promise.all([
+        sb.from('operadores').select('id,nombre,rol,activo'),
+        sb.from('bancos').select('*').order('orden')
+      ]);
+      S.ops = {}; (ro.data||[]).forEach(o=> S.ops[o.id] = o);
+      S.bancos = rb.data || [];
+      suscribir();
+    }
+  }
+  route();
+}
+function suscribir(){
+  const recargar = (tabla, payload)=>{
+    clearTimeout(S.reloadT);
+    S.reloadT = setTimeout(()=>{
+      const h = location.hash || '';
+      if (h === '' || h === '#bandeja') viewBandeja(true);
+      else if (h === '#agencias' && tabla === 'agencias') viewAgencias(true);
+      else if (h.indexOf('#consulta/') === 0 && tabla === 'consultas'){
+        const id = Number(h.split('/')[1]);
+        if (payload.new && payload.new.id === id) avisoCambioConsulta(payload.new);
+      }
+    }, 300);
+  };
+  S.channel = sb.channel('operador')
+    .on('postgres_changes', { event:'*', schema:'public', table:'consultas' }, p=>recargar('consultas', p))
+    .on('postgres_changes', { event:'*', schema:'public', table:'agencias' }, p=>recargar('agencias', p))
+    .subscribe();
+}
+async function salir(){ await sb.auth.signOut(); location.hash=''; }
+sb.auth.onAuthStateChange((ev, session)=>{
+  if (ev === 'SIGNED_OUT') return iniciar(null);
+  if (ev === 'SIGNED_IN' && !(S.user && session && S.user.id === session.user.id)) iniciar(session);
+});
+sb.auth.getSession().then(({data})=>iniciar(data.session));
+
+// ===================== LOGIN =====================
+function viewLogin(){
+  app.innerHTML = '<div class="center"><form class="box" id="fL" novalidate style="text-align:left;align-items:stretch">'
+   + '<div><div style="font-weight:700;color:var(--blue)">Portal Agencias</div><h1 style="font-size:26px;line-height:34px">Panel de operadores</h1></div>'
+   + '<div id="err" class="alert hidden"></div>'
+   + '<div class="f"><label for="em">Email</label><input id="em" type="email" autocomplete="email"></div>'
+   + '<div class="f"><label for="pw">Contraseña</label><input id="pw" type="password" autocomplete="current-password"></div>'
+   + '<button class="btn btn-b" type="submit">Ingresar</button>'
+   + '<p class="muted" style="margin:0;font-size:13px">¿Sos una agencia? <a href="./">Ingresá al portal de agencias</a></p></form></div>';
+  $('#fL').onsubmit = async e=>{
+    e.preventDefault();
+    const btn = e.target.querySelector('button'), er = $('#err');
+    er.classList.add('hidden');
+    busy(btn, true, 'Ingresando…');
+    const { error } = await sb.auth.signInWithPassword({ email:$('#em').value.trim(), password:$('#pw').value });
+    busy(btn, false);
+    if (error){ er.textContent = errMsg(error); er.classList.remove('hidden'); }
+  };
+}
+function viewNoOp(){
+  app.innerHTML = '<div class="center"><div class="box"><h1 style="font-size:24px;line-height:32px">Este usuario no es operador</h1>'
+   + '<p class="muted" style="margin:0">Si sos una agencia, ingresá desde el portal de agencias.</p>'
+   + '<div class="row" style="justify-content:center"><a class="btn btn-s" href="./">Ir al portal de agencias</a><button class="btn-link" id="bOut">Cerrar sesión</button></div></div></div>';
+  $('#bOut').onclick = salir;
+}
+
+// ===================== SHELL =====================
+function shell(activo, contenido, cnt){
+  cnt = cnt || {};
+  const item = (h, t, n)=>'<a class="nav'+(activo===h?' on':'')+'" href="'+h+'">'+t+(n?'<span class="cnt">'+n+'</span>':'')+'</a>';
+  return '<div class="shell"><nav class="side" aria-label="Menú"><div class="brand" style="padding-bottom:4px">Portal Agencias</div><div style="color:#A9B8D0;font-size:13px;padding:0 12px 20px">Panel operador</div>'
+    + item('#bandeja','Bandeja', cnt.nuevas) + item('#agencias','Agencias', esAdmin() ? cnt.pend : 0)
+    + '<div class="side-foot"><span>'+esc(S.op.nombre)+' · '+esc(S.op.rol)+'</span><button id="bOut">Cerrar sesión</button><span style="opacity:.7">v'+APP_VER+'</span></div></nav>'
+    + '<main class="main"><div class="wrap">'+contenido+'</div></main></div>';
+}
+function bindShell(){ const b = $('#bOut'); if (b) b.onclick = salir; }
+const cargando = t=>'<div class="loading" style="min-height:40vh"><span class="spin"></span>'+(t||'Cargando…')+'</div>';
+
+// ===================== BANDEJA =====================
+async function viewBandeja(silencioso){
+  if (!silencioso){ app.innerHTML = shell('#bandeja', cargando('Cargando bandeja…')); bindShell(); }
+  const [rc, ra] = await Promise.all([
+    sb.from('consultas').select('id,agencia_id,cliente_nombre,cliente_dni,vehiculo_marca,vehiculo_modelo,vehiculo_anio,vehiculo_condicion,monto_a_financiar,banco_id,plazo_deseado,bcra_resultado,estado,operador_id,created_at,tomada_at,respondida_at,agencia:agencias(razon_social,provincia)')
+      .order('created_at', { ascending:false }).limit(1000),
+    sb.from('agencias').select('*').eq('estado','pendiente').order('created_at')
+  ]);
+  if (rc.error){ toast(errMsg(rc.error)); return; }
+  S.consultas = rc.data || [];
+  const pend = ra.data || [];
+  const c = S.consultas, ahora = Date.now();
+  const nuevas = c.filter(x=>x.estado==='nueva').length;
+  const enAn = c.filter(x=>x.estado==='en_analisis').length;
+  const resp = c.filter(x=>x.respondida_at && (ahora - new Date(x.created_at)) < 30*864e5);
+  const prom = resp.length ? resp.reduce((s,x)=>s + (new Date(x.respondida_at) - new Date(x.created_at)), 0) / resp.length : null;
+
+  const tile = (t, v, col)=>'<div class="tile"><span>'+t+'</span><span'+(col?' style="color:'+col+'"':'')+'>'+v+'</span></div>';
+  let html = '<h1>Bandeja</h1><div class="tiles">' + tile('Nuevas sin tomar', nuevas, 'var(--b-r)') + tile('En análisis', enAn, 'var(--blue)')
+    + tile('Agencias por aprobar', pend.length) + tile('Respuesta promedio (30 días)', prom==null ? '—' : dur(prom)) + '</div>';
+
+  if (pend.length){
+    html += '<section class="card"><h2 style="font-size:18px">Agencias pendientes de aprobación</h2>'
+      + pend.map(a=>'<div class="pend"><div style="display:flex;flex-direction:column;gap:2px;font-size:14px"><b style="font-size:15px">'+esc(a.razon_social)+'</b>'
+        + '<span class="muted">CUIT '+esc(fmtCuit(a.cuit))+' · '+esc(a.responsable)+' · '+esc(a.telefono)+' · '+esc([a.localidad,a.provincia].filter(Boolean).join(', '))+' · '+esc(a.email)+' · '+dur(ahora - new Date(a.created_at))+'</span></div>'
+        + (esAdmin() ? '<div class="row" style="gap:8px"><button class="btn btn-s btn-sm" data-rech="'+a.id+'">Rechazar</button><button class="btn btn-b btn-sm" data-apr="'+a.id+'">Aprobar</button></div>' : '<span class="muted" style="font-size:13px">Solo un admin puede aprobar</span>')
+        + '</div>').join('') + '</section>';
+  }
+
+  const agOpts = Array.from(new Map(c.map(x=>[x.agencia_id, x.agencia ? x.agencia.razon_social : '—'])).entries()).sort((a,b)=>a[1].localeCompare(b[1]));
+  html += '<section style="display:flex;flex-direction:column;gap:14px"><div class="row between"><div class="row"><h2 style="font-size:18px">Consultas</h2><span class="live"><i></i>En vivo</span></div>'
+    + '<div class="row" style="gap:8px"><select id="fV" class="in" aria-label="Vista">'
+    + [['activas','Nuevas y en análisis'],['mias','Solo las mías'],['respondidas','Respondidas'],['todas','Todas']].map(o=>'<option value="'+o[0]+'"'+(S.filtro.vista===o[0]?' selected':'')+'>'+o[1]+'</option>').join('')
+    + '</select><select id="fA" class="in" aria-label="Agencia"><option value="">Todas las agencias</option>'
+    + agOpts.map(o=>'<option value="'+esc(o[0])+'"'+(S.filtro.agencia===o[0]?' selected':'')+'>'+esc(o[1])+'</option>').join('')
+    + '</select></div></div><div id="lista"></div></section>';
+
+  app.innerHTML = shell('#bandeja', html, { nuevas, pend: pend.length }); bindShell();
+  $('#fV').onchange = e=>{ S.filtro.vista = e.target.value; pintarBandeja(); };
+  $('#fA').onchange = e=>{ S.filtro.agencia = e.target.value; pintarBandeja(); };
+  $$('[data-apr]').forEach(b=> b.onclick = async ()=>{
+    const a = pend.find(x=>x.id===b.dataset.apr);
+    if (await modal('¿Aprobar a '+a.razon_social+'? Va a poder cargar consultas.', 'Aprobar') === null) return;
+    busy(b, true);
+    const { error } = await sb.rpc('aprobar_agencia', { p_agencia:a.id });
+    if (error){ busy(b,false); return toast(errMsg(error)); }
+    toast(a.razon_social+' aprobada.'); viewBandeja(true);
+  });
+  $$('[data-rech]').forEach(b=> b.onclick = async ()=>{
+    const a = pend.find(x=>x.id===b.dataset.rech);
+    const mot = await modal('¿Rechazar la solicitud de '+a.razon_social+'?', 'Rechazar', 'Motivo (lo ve la agencia, opcional)');
+    if (mot === null) return;
+    busy(b, true);
+    const { error } = await sb.rpc('rechazar_agencia', { p_agencia:a.id, p_motivo: mot || null });
+    if (error){ busy(b,false); return toast(errMsg(error)); }
+    toast('Solicitud rechazada.'); viewBandeja(true);
+  });
+  pintarBandeja();
+}
+function bcraTxt(b){
+  if (!b) return '<span class="muted">—</span>';
+  const sit = b.situacion != null ? b.situacion : b.sit;
+  if (sit == null) return '<span class="b b-nueva">Sin datos</span>';
+  return '<span class="b '+(Number(sit)<=1?'b-aprobado':'b-respondida')+'">Sit. '+esc(sit)+'</span>';
+}
+function pintarBandeja(){
+  const box = $('#lista'); if (!box) return;
+  const v = S.filtro.vista, ahora = Date.now();
+  let rows = S.consultas.filter(x=>{
+    if (S.filtro.agencia && x.agencia_id !== S.filtro.agencia) return false;
+    if (v === 'activas') return x.estado==='nueva' || x.estado==='en_analisis';
+    if (v === 'mias') return x.operador_id === S.user.id && x.estado !== 'nueva';
+    if (v === 'respondidas') return ['respondida','aceptada','desistida','cerrada'].indexOf(x.estado) >= 0;
+    return true;
+  });
+  if (v === 'activas') rows.sort((a,b)=> (a.estado===b.estado ? new Date(a.created_at)-new Date(b.created_at) : (a.estado==='nueva'?-1:1)));
+  if (!rows.length){ box.innerHTML = '<div class="tbox"><div class="empty">No hay consultas para mostrar.</div></div>'; return; }
+  box.innerHTML = '<div class="tbox"><table class="t" style="min-width:900px"><thead><tr><th>N°</th><th>Agencia</th><th>Cliente</th><th>Vehículo · monto</th><th>Banco / plazo</th><th>BCRA</th><th>Espera</th><th>Estado</th><th></th></tr></thead><tbody>'
+    + rows.map(x=>{
+      const veh = [x.vehiculo_marca, x.vehiculo_modelo, x.vehiculo_condicion==='0km'?'0km':x.vehiculo_anio].filter(Boolean).join(' ') || '—';
+      const banco = x.banco_id ? ((S.bancos.find(b=>b.id===x.banco_id)||{}).nombre||'—') : 'Todos';
+      const activa = x.estado==='nueva' || x.estado==='en_analisis';
+      const espera = activa ? dur(ahora - new Date(x.created_at)) : '—';
+      const urg = activa && (ahora - new Date(x.created_at)) > 3600e3;
+      const mia = x.operador_id === S.user.id;
+      let acc;
+      if (x.estado === 'nueva') acc = '<button class="btn btn-b btn-sm" data-tomar="'+x.id+'">Tomar</button>';
+      else if (x.estado === 'en_analisis' && (mia || esAdmin())) acc = '<a class="btn btn-s btn-sm" href="#consulta/'+x.id+'">Cargar ofertas</a>';
+      else if (x.estado === 'en_analisis') acc = '<span class="lock">'+ICON_LOCK+'Tomada por '+esc(opNombre(x.operador_id))+'</span>';
+      else acc = '<a href="#consulta/'+x.id+'">Ver</a>';
+      return '<tr'+(x.estado==='en_analisis' && !mia ? ' style="background:#F7F7F5"' : '')+'><td>'+nro(x.id)+'</td><td>'+esc(x.agencia?x.agencia.razon_social:'—')+'</td>'
+        + '<td><b>'+esc(x.cliente_nombre)+'</b><br><span class="muted">DNI '+esc(fmtDni(x.cliente_dni))+'</span></td>'
+        + '<td>'+esc(veh)+'<br><span class="muted">'+montoFin(x.monto_a_financiar)+'</span></td>'
+        + '<td>'+esc(banco)+'<br><span class="muted">'+(x.plazo_deseado ? x.plazo_deseado+' meses' : 'Indistinto')+'</span></td>'
+        + '<td>'+bcraTxt(x.bcra_resultado)+'</td>'
+        + '<td'+(urg?' style="color:var(--b-r);font-weight:600"':'')+'>'+espera+'</td>'
+        + '<td>'+badge(x.estado, x.operador_id && x.estado!=='nueva' ? opNombre(x.operador_id) : '')+'</td><td>'+acc+'</td></tr>';
+    }).join('') + '</tbody></table></div>';
+  $$('[data-tomar]', box).forEach(b=> b.onclick = async ()=>{
+    const id = Number(b.dataset.tomar);
+    busy(b, true);
+    const { error } = await sb.rpc('tomar_consulta', { p_consulta:id });
+    if (error){ busy(b,false); toast(errMsg(error)); return viewBandeja(true); }
+    go('#consulta/'+id);
+  });
+}
+
+// ===================== AGENCIAS =====================
+async function viewAgencias(silencioso){
+  if (!silencioso){ app.innerHTML = shell('#agencias', cargando('Cargando agencias…')); bindShell(); }
+  const { data, error } = await sb.from('agencias').select('*').order('created_at', { ascending:false });
+  if (error){ toast(errMsg(error)); return; }
+  S.agencias = data || [];
+  const cnt = k=> S.agencias.filter(a=>a.estado===k).length;
+  const tabs = [['pendiente','Pendientes'],['aprobada','Aprobadas'],['rechazada','Rechazadas'],['suspendida','Suspendidas'],['','Todas']];
+  const rows = S.agencias.filter(a=>!S.agFiltro || a.estado===S.agFiltro);
+  let html = '<h1>Agencias</h1><div class="seg">' + tabs.map(t=>'<button data-tab="'+t[0]+'" class="'+(S.agFiltro===t[0]?'on-ok':'')+'" style="'+(S.agFiltro===t[0]?'background:var(--blue);border-color:var(--blue);color:#fff':'')+'">'+t[1]+(t[0]?' ('+cnt(t[0])+')':'')+'</button>').join('') + '</div>';
+  if (!rows.length) html += '<div class="tbox"><div class="empty">No hay agencias en este estado.</div></div>';
+  else html += '<div class="tbox"><table class="t" style="min-width:900px"><thead><tr><th>Agencia</th><th>Responsable</th><th>Contacto</th><th>Ubicación</th><th>Alta</th><th>Estado</th><th></th></tr></thead><tbody>'
+    + rows.map(a=>{
+      let acc = '';
+      if (esAdmin()){
+        if (a.estado==='pendiente') acc = '<div class="row" style="gap:6px"><button class="btn btn-s btn-sm" data-rech="'+a.id+'">Rechazar</button><button class="btn btn-b btn-sm" data-apr="'+a.id+'">Aprobar</button></div>';
+        else if (a.estado==='aprobada') acc = '<button class="btn btn-s btn-sm" data-susp="'+a.id+'">Suspender</button>';
+        else acc = '<button class="btn btn-s btn-sm" data-apr="'+a.id+'">Habilitar</button>';
+      }
+      const bAg = a.estado==='aprobada' ? 'b-aprobado' : (a.estado==='pendiente' ? 'b-respondida' : 'b-rechazado');
+      return '<tr><td><b>'+esc(a.razon_social)+'</b><br><span class="muted">CUIT '+esc(fmtCuit(a.cuit))+'</span></td><td>'+esc(a.responsable)+'</td>'
+        + '<td>'+esc(a.telefono)+'<br><span class="muted">'+esc(a.email)+'</span></td><td>'+esc([a.localidad,a.provincia].filter(Boolean).join(', '))+'</td>'
+        + '<td>'+fmtD(a.created_at)+'</td><td><span class="b '+bAg+'">'+esc(EST_AG[a.estado]||a.estado)+'</span>'+(a.motivo_estado?'<br><span class="muted" style="font-size:12px">'+esc(a.motivo_estado)+'</span>':'')+'</td><td>'+acc+'</td></tr>';
+    }).join('') + '</tbody></table></div>';
+  app.innerHTML = shell('#agencias', html, { pend: cnt('pendiente') }); bindShell();
+  $$('[data-tab]').forEach(b=> b.onclick = ()=>{ S.agFiltro = b.dataset.tab; viewAgencias(true); });
+  const porId = id=> S.agencias.find(a=>a.id===id);
+  $$('[data-apr]').forEach(b=> b.onclick = async ()=>{
+    const a = porId(b.dataset.apr);
+    if (await modal('¿Habilitar a '+a.razon_social+'?', 'Habilitar') === null) return;
+    const { error } = await sb.rpc('aprobar_agencia', { p_agencia:a.id });
+    if (error) return toast(errMsg(error));
+    toast(a.razon_social+' habilitada.'); viewAgencias(true);
+  });
+  $$('[data-rech]').forEach(b=> b.onclick = async ()=>{
+    const a = porId(b.dataset.rech);
+    const mot = await modal('¿Rechazar la solicitud de '+a.razon_social+'?', 'Rechazar', 'Motivo (lo ve la agencia, opcional)');
+    if (mot === null) return;
+    const { error } = await sb.rpc('rechazar_agencia', { p_agencia:a.id, p_motivo: mot || null });
+    if (error) return toast(errMsg(error));
+    toast('Solicitud rechazada.'); viewAgencias(true);
+  });
+  $$('[data-susp]').forEach(b=> b.onclick = async ()=>{
+    const a = porId(b.dataset.susp);
+    const mot = await modal('¿Suspender a '+a.razon_social+'? No va a poder ver ni cargar consultas.', 'Suspender', 'Motivo (lo ve la agencia, opcional)');
+    if (mot === null) return;
+    const { error } = await sb.from('agencias').update({ estado:'suspendida', motivo_estado: mot || null }).eq('id', a.id);
+    if (error) return toast(errMsg(error));
+    toast('Agencia suspendida.'); viewAgencias(true);
+  });
+}
+
+// ===================== CONSULTA / CARGAR OFERTAS =====================
+function bancosDisponibles(prov){ return S.bancos.filter(b=>b.activo && (!b.provincias || b.provincias.indexOf(prov) >= 0)); }
+function bloqueVacio(banco, plazoDeseado){
+  const plazos = plazoDeseado ? [plazoDeseado] : PLAZOS.slice();
+  return { banco_id: banco ? banco.id : null, resultado:'aprobado', monto:'', vigencia:'', fija:true, uva: !!(banco && banco.admite_uva),
+    filas: plazos.map(p=>({ plazo:p, fija:'', uva:'' })), requisitos:'', motivo:'' };
+}
+
+async function viewConsulta(id){
+  app.innerHTML = shell('#bandeja', cargando('Cargando consulta…')); bindShell();
+  const [rc, ro] = await Promise.all([
+    sb.from('consultas').select('*, agencia:agencias(razon_social,provincia,responsable,telefono,email)').eq('id', id).maybeSingle(),
+    sb.from('ofertas').select('id,banco_id,resultado,monto_aprobado,vigencia_hasta,requisitos,cuotas:oferta_cuotas(id,plazo_meses,tipo_tasa,cuota),motivo:ofertas_motivos(motivo)').eq('consulta_id', id)
+  ]);
+  if (rc.error) return toast(errMsg(rc.error));
+  const c = rc.data;
+  if (!c){ app.innerHTML = shell('#bandeja', '<div class="card"><h2>No existe la consulta</h2><a href="#bandeja">Volver</a></div>'); bindShell(); return; }
+  const ofertas = ro.data || [];
+  const editable = c.estado === 'en_analisis' && (c.operador_id === S.user.id || esAdmin());
+
+  // armar bloques
+  const disp = bancosDisponibles(c.agencia ? c.agencia.provincia : null);
+  let bloques;
+  if (ofertas.length){
+    bloques = ofertas.map(o=>{
+      const banco = S.bancos.find(b=>b.id===o.banco_id);
+      const cu = o.cuotas || [];
+      const plazos = Array.from(new Set(cu.map(q=>q.plazo_meses))).sort((a,b)=>a-b);
+      const mot = Array.isArray(o.motivo) ? (o.motivo[0]||{}).motivo : (o.motivo||{}).motivo;
+      return { banco_id:o.banco_id, resultado:o.resultado, monto: o.monto_aprobado!=null ? '$ '+nf.format(o.monto_aprobado) : '', vigencia:o.vigencia_hasta||'',
+        fija: cu.length ? cu.some(q=>q.tipo_tasa==='fija') : true, uva: cu.some(q=>q.tipo_tasa==='uva'),
+        filas: plazos.length ? plazos.map(p=>{ const f = cu.find(q=>q.plazo_meses===p && q.tipo_tasa==='fija'), u = cu.find(q=>q.plazo_meses===p && q.tipo_tasa==='uva');
+          return { plazo:p, fija: f ? '$ '+nf.format(f.cuota) : '', uva: u ? '$ '+nf.format(u.cuota) : '' }; }) : (banco ? bloqueVacio(banco, c.plazo_deseado).filas : []),
+        requisitos:o.requisitos||'', motivo: mot||'' };
+    });
+  } else if (c.banco_id){
+    bloques = [bloqueVacio(S.bancos.find(b=>b.id===c.banco_id), c.plazo_deseado)];
+  } else {
+    bloques = disp.map(b=>bloqueVacio(b, c.plazo_deseado));
+  }
+  bloques.forEach(b=>{ if (!b.monto && c.monto_a_financiar) b.monto = '$ '+nf.format(c.monto_a_financiar); });
+  let aceptada = '';
+  if (c.cuota_aceptada_id){
+    ofertas.forEach(o=>(o.cuotas||[]).forEach(q=>{
+      if (q.id === c.cuota_aceptada_id) aceptada = ((S.bancos.find(b=>b.id===o.banco_id)||{}).nombre||'Banco')+' · '+q.plazo_meses+' cuotas · '+(q.tipo_tasa==='uva'?'UVA (cuota inicial)':'Tasa fija')+' · '+money(q.cuota);
+    }));
+  }
+  S.ed = { c, bloques, disp, editable, sucio:false, aceptada };
+  pintarConsulta();
+}
+
+function avisoCambioConsulta(nueva){
+  if (!S.ed || S.ed.c.id !== nueva.id) return;
+  const antes = S.ed.c;
+  if (nueva.operador_id !== antes.operador_id || nueva.estado !== antes.estado){
+    if (S.ed.editable && nueva.operador_id !== S.user.id && !esAdmin()){
+      toast('Esta consulta fue reasignada o liberada. Ya no podés editarla.');
+      viewConsulta(nueva.id);
+    } else if (!S.ed.sucio) viewConsulta(nueva.id);
+  }
+}
+
+function syncEd(){
+  if (!S.ed || !S.ed.editable) return;
+  $$('.blq').forEach((el, i)=>{
+    const b = S.ed.bloques[i]; if (!b) return;
+    b.banco_id = Number($('[data-k=banco]', el).value) || null;
+    if (b.resultado === 'aprobado'){
+      b.monto = $('[data-k=monto]', el).value; b.vigencia = $('[data-k=vig]', el).value;
+      b.fija = $('[data-k=tfija]', el).checked; b.uva = $('[data-k=tuva]', el).checked;
+      $$('tr[data-fila]', el).forEach((tr, j)=>{
+        const f = b.filas[j]; if (!f) return;
+        f.plazo = Number($('[data-k=plazo]', tr).value);
+        const fi = $('[data-k=cfija]', tr), ui = $('[data-k=cuva]', tr);
+        if (fi) f.fija = fi.value; if (ui) f.uva = ui.value;
+      });
+      b.requisitos = $('[data-k=req]', el).value;
+    } else {
+      b.motivo = $('[data-k=mot]', el).value;
+    }
+  });
+}
+
+function pintarConsulta(){
+  const { c, bloques, disp, editable } = S.ed;
+  const veh = [c.vehiculo_marca, c.vehiculo_modelo, c.vehiculo_condicion==='0km'?'0km':c.vehiculo_anio].filter(Boolean).join(' ') || '—';
+  const bancoPed = c.banco_id ? ((S.bancos.find(b=>b.id===c.banco_id)||{}).nombre||'—') : 'Todos';
+  const kv = (k, v, st)=>'<div class="kv"><span>'+k+'</span><span'+(st?' style="'+st+'"':'')+'>'+v+'</span></div>';
+  let html = '<div><a href="#bandeja" style="font-size:14px;text-decoration:none">← Bandeja</a><div class="row"><h1>'+(editable?'Cargar ofertas · ':'')+'Consulta N° '+nro(c.id)+'</h1>'
+    + badge(c.estado, c.operador_id && c.estado!=='nueva' ? opNombre(c.operador_id) : '')+'</div></div>';
+  if (c.estado === 'en_analisis' && !editable) html += '<div class="banner">'+ICON_LOCK+' Esta consulta la tiene '+esc(opNombre(c.operador_id))+'. Podés verla pero no modificarla.</div>';
+  if (c.estado === 'nueva') html += '<div class="banner">Esta consulta todavía no fue tomada. <button class="btn btn-b btn-sm" id="bTomar" style="margin-left:8px">Tomar</button></div>';
+
+  html += '<section class="card" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:18px">'
+    + kv('Agencia', esc(c.agencia?c.agencia.razon_social:'—')+'<br><span class="muted" style="font-size:13px">'+esc(c.agencia?(c.agencia.responsable+' · '+c.agencia.telefono):'')+'</span>')
+    + kv('Cliente', esc(c.cliente_nombre)+'<br><span class="muted" style="font-size:13px">DNI '+esc(fmtDni(c.cliente_dni))+(c.cliente_cuit?' · CUIL '+esc(fmtCuit(c.cliente_cuit)):'')+'</span>')
+    + kv('Vehículo', esc(veh)+(c.valor_vehiculo?'<br><span class="muted" style="font-size:13px">Valor '+money(c.valor_vehiculo)+'</span>':''))
+    + kv('Monto a financiar', montoFin(c.monto_a_financiar), c.monto_a_financiar?'':'font-weight:700;color:var(--b-r)')
+    + kv('Plazo deseado', c.plazo_deseado ? c.plazo_deseado+' meses' : 'Indistinto', c.plazo_deseado?'':'font-weight:700;color:var(--b-r)')
+    + kv('Banco', esc(bancoPed)) + kv('BCRA', bcraTxt(c.bcra_resultado)) + kv('Cargada', fmtD(c.created_at,true))
+    + (c.dni_frente_path ? kv('DNI', '<button class="btn-link" data-dni="'+esc(c.dni_frente_path)+'">Frente</button> · <button class="btn-link" data-dni="'+esc(c.dni_dorso_path)+'">Dorso</button>') : '')
+    + (c.observaciones ? '<div class="kv" style="grid-column:1/-1"><span>Observaciones de la agencia</span><span>'+esc(c.observaciones)+'</span></div>' : '')
+    + '</section>';
+
+  if (editable){
+    html += '<div id="err" class="alert hidden"></div>';
+    html += bloques.map((b, i)=>bloqueHtml(b, i, disp)).join('');
+    html += '<div><button class="ghost" id="addB">+ Agregar banco</button></div>'
+      + '<div class="row between"><button class="btn-link" id="bLib">Liberar consulta (vuelve a "Nueva")</button>'
+      + '<div class="row"><button class="btn btn-s" id="bBor">Guardar borrador</button><button class="btn btn-b" id="bEnv">Enviar respuesta a la agencia</button></div></div>';
+  } else if (c.estado !== 'nueva') {
+    html += soloLectura();
+  }
+  app.innerHTML = shell('#bandeja', html); bindShell();
+  bindConsulta();
+}
+
+function bloqueHtml(b, i, disp){
+  const banco = S.bancos.find(x=>x.id===b.banco_id);
+  const okUva = !banco || banco.admite_uva;
+  if (!okUva) b.uva = false;
+  const opts = disp.map(x=>'<option value="'+x.id+'"'+(x.id===b.banco_id?' selected':'')+'>'+esc(x.nombre)+'</option>').join('');
+  let h = '<article class="card blq" data-i="'+i+'"><div class="row between" style="align-items:flex-end">'
+    + '<div class="f" style="width:220px"><label>Banco</label><select data-k="banco"><option value="">Elegir…</option>'+opts+'</select></div>'
+    + '<div class="row" style="gap:8px"><div class="seg"><button type="button" data-res="aprobado" class="'+(b.resultado==='aprobado'?'on-ok':'')+'">Aprobado</button><button type="button" data-res="rechazado" class="'+(b.resultado==='rechazado'?'on-no':'')+'">Rechazado</button></div>'
+    + '<button type="button" class="x" data-delb title="Quitar este banco" aria-label="Quitar este banco">✕</button></div></div>';
+  if (b.resultado === 'rechazado'){
+    h += '<div class="f"><label>Motivo (solo lo ven los operadores)</label><input data-k="mot" value="'+esc(b.motivo)+'"></div></article>';
+    return h;
+  }
+  h += '<div class="grid"><div class="f"><label>Monto aprobado</label><input data-k="monto" class="money" inputmode="decimal" value="'+esc(b.monto)+'"></div>'
+    + '<div class="f"><label>Vigente hasta</label><input data-k="vig" type="date" value="'+esc(b.vigencia)+'"></div></div>'
+    + '<div class="row" style="gap:20px"><span class="lbl">Tipo de tasa</span><label class="chk"><input type="checkbox" data-k="tfija"'+(b.fija?' checked':'')+'>Fija</label>'
+    + '<label class="chk'+(okUva?'':' dis')+'"><input type="checkbox" data-k="tuva"'+(b.uva?' checked':'')+(okUva?'':' disabled')+'>UVA</label>'
+    + (okUva?'':'<span class="muted" style="font-size:13px">'+esc(banco.nombre)+' solo opera con tasa fija</span>') + '</div>'
+    + '<div style="display:flex;flex-direction:column;gap:8px"><div class="row between"><span class="lbl">Plazos y cuotas</span><button type="button" class="ghost" data-todos>Completar todos los plazos (12 a 60)</button></div>'
+    + '<div style="overflow-x:auto"><table class="ptab"><thead><tr><th>Plazo</th>'+(b.fija?'<th>Cuota fija</th>':'')+(b.uva?'<th>Cuota UVA inicial</th>':'')+'<th></th></tr></thead><tbody>'
+    + b.filas.map((f, j)=>'<tr data-fila="'+j+'"><td><select class="in" data-k="plazo" aria-label="Plazo" style="width:130px">'
+        + Array.from(new Set(PLAZOS.concat([f.plazo]))).sort((a,b)=>a-b).map(p=>'<option value="'+p+'"'+(p===f.plazo?' selected':'')+'>'+p+' meses</option>').join('') + '</select></td>'
+        + (b.fija?'<td><input class="in money" data-k="cfija" inputmode="decimal" aria-label="Cuota fija" style="width:170px" value="'+esc(f.fija)+'"></td>':'')
+        + (b.uva?'<td><input class="in money" data-k="cuva" inputmode="decimal" aria-label="Cuota UVA" style="width:170px" value="'+esc(f.uva)+'"></td>':'')
+        + '<td><button type="button" class="x" data-delf="'+j+'" aria-label="Quitar plazo">✕</button></td></tr>').join('')
+    + '</tbody></table></div><div><button type="button" class="ghost" data-addf>+ Agregar plazo</button></div></div>'
+    + '<div class="f"><label>Requisitos u observaciones (las ve la agencia)</label><textarea data-k="req">'+esc(b.requisitos)+'</textarea></div></article>';
+  return h;
+}
+
+function soloLectura(){
+  const { bloques } = S.ed;
+  if (!bloques.length) return '<div class="card"><p class="muted" style="margin:0">Sin ofertas cargadas.</p></div>';
+  const c = S.ed.c;
+  return '<h2 style="font-size:19px">Ofertas enviadas</h2>' + bloques.map(b=>{
+    const banco = (S.bancos.find(x=>x.id===b.banco_id)||{}).nombre || '—';
+    if (b.resultado==='rechazado') return '<article class="bank" style="flex-direction:row;justify-content:space-between;align-items:center;flex-wrap:wrap"><h3>'+esc(banco)+'</h3><span class="row"><span class="muted" style="font-size:13px">'+esc(b.motivo)+'</span><span class="b b-rechazado">Rechazado</span></span></article>';
+    return '<article class="bank"><div class="row between"><h3>'+esc(banco)+'</h3><span class="b b-aprobado">Aprobado</span></div>'
+      + '<div class="row" style="gap:32px"><div class="kv"><span>Monto aprobado</span><span class="big">'+esc(b.monto||'—')+'</span></div>'+(b.vigencia?'<div class="kv"><span>Vigente hasta</span><span class="big">'+esc(b.vigencia.split('-').reverse().join('/'))+'</span></div>':'')+'</div>'
+      + '<div style="border:1px solid var(--line2);border-radius:10px;overflow-x:auto"><table class="pt"><thead><tr><th>Plazo</th>'+(b.fija?'<th>Tasa fija</th>':'')+(b.uva?'<th>UVA · cuota inicial</th>':'')+'</tr></thead><tbody>'
+      + b.filas.map(f=>'<tr><td><b>'+f.plazo+' cuotas</b></td>'+(b.fija?'<td>'+esc(f.fija||'—')+'</td>':'')+(b.uva?'<td>'+esc(f.uva||'—')+'</td>':'')+'</tr>').join('')
+      + '</tbody></table></div>'+(b.requisitos?'<p style="margin:0;font-size:14px"><b>Requisitos:</b> '+esc(b.requisitos)+'</p>':'')+'</article>';
+  }).join('') + (c.estado==='aceptada' ? '<div class="alert ok"><b>La agencia aceptó:</b> '+esc(S.ed.aceptada||'—')+'</div>' : '')
+    + (c.estado==='desistida' ? '<div class="alert">El cliente desistió de esta consulta.</div>' : '');
+}
+
+function bindConsulta(){
+  const ed = S.ed, c = ed.c;
+  $$('[data-dni]').forEach(b=> b.onclick = async ()=>{
+    const { data, error } = await sb.storage.from('dni').createSignedUrl(b.dataset.dni, 600);
+    if (error) return toast(errMsg(error));
+    window.open(data.signedUrl, '_blank', 'noopener');
+  });
+  const bT = $('#bTomar');
+  if (bT) bT.onclick = async ()=>{
+    busy(bT, true);
+    const { error } = await sb.rpc('tomar_consulta', { p_consulta:c.id });
+    if (error){ busy(bT,false); return toast(errMsg(error)); }
+    viewConsulta(c.id);
+  };
+  if (!ed.editable) return;
+  const re = ()=>{ ed.sucio = true; pintarConsulta(); };
+  $$('.money').forEach(el=> el.addEventListener('blur', ()=>fmtMonedaInput(el)));
+  $$('.blq input, .blq select, .blq textarea').forEach(el=> el.addEventListener('input', ()=>{ ed.sucio = true; }));
+  $$('.blq').forEach((el)=>{
+    const i = Number(el.dataset.i), b = ed.bloques[i];
+    $('[data-k=banco]', el).onchange = e=>{
+      syncEd();
+      const banco = S.bancos.find(x=>x.id===Number(e.target.value));
+      if (banco && !banco.admite_uva) b.uva = false;
+      re();
+    };
+    $$('[data-res]', el).forEach(btn=> btn.onclick = ()=>{ syncEd(); b.resultado = btn.dataset.res; re(); });
+    $('[data-delb]', el).onclick = ()=>{ syncEd(); ed.bloques.splice(i,1); re(); };
+    if (b.resultado === 'aprobado'){
+      $('[data-k=tfija]', el).onchange = ()=>{ syncEd(); re(); };
+      $('[data-k=tuva]', el).onchange = ()=>{ syncEd(); re(); };
+      $('[data-todos]', el).onclick = ()=>{
+        syncEd();
+        PLAZOS.forEach(p=>{ if (!b.filas.some(f=>f.plazo===p)) b.filas.push({ plazo:p, fija:'', uva:'' }); });
+        b.filas.sort((a,z)=>a.plazo-z.plazo); re();
+      };
+      $('[data-addf]', el).onclick = ()=>{
+        syncEd();
+        const libre = PLAZOS.find(p=>!b.filas.some(f=>f.plazo===p)) || 12;
+        b.filas.push({ plazo:libre, fija:'', uva:'' }); re();
+      };
+      $$('[data-delf]', el).forEach(x=> x.onclick = ()=>{ syncEd(); b.filas.splice(Number(x.dataset.delf),1); re(); });
+    }
+  });
+  $('#addB').onclick = ()=>{
+    syncEd();
+    const usado = ed.bloques.map(b=>b.banco_id);
+    const libre = ed.disp.find(b=>usado.indexOf(b.id) < 0);
+    ed.bloques.push(bloqueVacio(libre || null, c.plazo_deseado));
+    re();
+  };
+  $('#bLib').onclick = async ()=>{
+    if (await modal('¿Liberar la consulta N° '+nro(c.id)+'? Vuelve a "Nueva" para que la tome otro operador. Los borradores que hayas guardado se mantienen.', 'Liberar') === null) return;
+    const { error } = await sb.rpc('liberar_consulta', { p_consulta:c.id });
+    if (error) return toast(errMsg(error));
+    toast('Consulta liberada.'); go('#bandeja');
+  };
+  $('#bBor').onclick = async e=>{ const b = e.currentTarget; busy(b, true, 'Guardando…'); const ok = await guardar(); busy(b, false); if (ok){ ed.sucio = false; toast('Borrador guardado. La agencia todavía no lo ve.'); } };
+  $('#bEnv').onclick = async e=>{
+    const b = e.currentTarget;
+    if (await modal('¿Enviar la respuesta a la agencia? Después no se puede modificar.', 'Enviar') === null) return;
+    busy(b, true, 'Enviando…');
+    const ok = await guardar();
+    if (!ok){ busy(b,false); return; }
+    const { error } = await sb.rpc('enviar_respuesta', { p_consulta:c.id });
+    busy(b, false);
+    if (error) return mostrarErr(errMsg(error));
+    ed.sucio = false; toast('Respuesta enviada a la agencia.'); viewConsulta(c.id);
+  };
+}
+
+function mostrarErr(m){ const er = $('#err'); if (!er) return toast(m); er.textContent = m; er.classList.remove('hidden'); er.scrollIntoView({ block:'center', behavior:'smooth' }); }
+
+async function guardar(){
+  syncEd();
+  const ed = S.ed, c = ed.c;
+  const er = $('#err'); if (er) er.classList.add('hidden');
+  // validar
+  const ids = ed.bloques.map(b=>b.banco_id);
+  if (!ed.bloques.length) return mostrarErr('Agregá al menos un banco.'), false;
+  if (ids.some(x=>!x)) return mostrarErr('Hay un bloque sin banco elegido.'), false;
+  if (new Set(ids).size !== ids.length) return mostrarErr('Hay un banco repetido. Cada banco va una sola vez.'), false;
+  const planes = [];
+  for (const b of ed.bloques){
+    const banco = S.bancos.find(x=>x.id===b.banco_id);
+    if (b.resultado === 'rechazado'){ planes.push({ b, banco, cuotas:[] }); continue; }
+    const monto = parseMoneda(b.monto);
+    if (!monto || monto <= 0) return mostrarErr(banco.nombre+': falta el monto aprobado.'), false;
+    if (!b.fija && !b.uva) return mostrarErr(banco.nombre+': elegí al menos un tipo de tasa.'), false;
+    const plazos = b.filas.map(f=>f.plazo);
+    if (new Set(plazos).size !== plazos.length) return mostrarErr(banco.nombre+': hay un plazo repetido.'), false;
+    const cuotas = [];
+    for (const f of b.filas){
+      if (b.fija){ const v = parseMoneda(f.fija); if (v) cuotas.push({ plazo_meses:f.plazo, tipo_tasa:'fija', cuota:v }); }
+      if (b.uva && banco.admite_uva){ const v = parseMoneda(f.uva); if (v) cuotas.push({ plazo_meses:f.plazo, tipo_tasa:'uva', cuota:v }); }
+    }
+    if (!cuotas.length) return mostrarErr(banco.nombre+': cargá al menos una cuota.'), false;
+    planes.push({ b, banco, monto, cuotas });
+  }
+  try{
+    // borrar bancos quitados
+    const { data: exist, error: e0 } = await sb.from('ofertas').select('id,banco_id').eq('consulta_id', c.id);
+    if (e0) throw e0;
+    const borrar = (exist||[]).filter(o=>ids.indexOf(o.banco_id) < 0).map(o=>o.id);
+    if (borrar.length){ const { error } = await sb.from('ofertas').delete().in('id', borrar); if (error) throw error; }
+    for (const p of planes){
+      const aprob = p.b.resultado === 'aprobado';
+      const { data: of, error: e1 } = await sb.from('ofertas').upsert({
+        consulta_id:c.id, banco_id:p.b.banco_id, resultado:p.b.resultado,
+        monto_aprobado: aprob ? p.monto : null, vigencia_hasta: aprob && p.b.vigencia ? p.b.vigencia : null,
+        requisitos: aprob ? (p.b.requisitos.trim() || null) : null, cargado_por:S.user.id
+      }, { onConflict:'consulta_id,banco_id' }).select('id').single();
+      if (e1) throw e1;
+      const { error: e2 } = await sb.from('oferta_cuotas').delete().eq('oferta_id', of.id);
+      if (e2) throw e2;
+      if (p.cuotas.length){
+        const { error: e3 } = await sb.from('oferta_cuotas').insert(p.cuotas.map(q=>Object.assign({ oferta_id:of.id }, q)));
+        if (e3) throw e3;
+      }
+      const mot = !aprob ? (p.b.motivo||'').trim() : '';
+      if (mot){ const { error } = await sb.from('ofertas_motivos').upsert({ oferta_id:of.id, motivo:mot }); if (error) throw error; }
+      else { const { error } = await sb.from('ofertas_motivos').delete().eq('oferta_id', of.id); if (error) throw error; }
+    }
+    return true;
+  } catch(e){
+    mostrarErr('No se pudo guardar: ' + errMsg(e));
+    return false;
+  }
+}
+
+window.addEventListener('beforeunload', e=>{ if (S.ed && S.ed.sucio && S.ed.editable){ e.preventDefault(); e.returnValue=''; } });
+
+})();
+
+</script>
+</body>
+</html>

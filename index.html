@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Portal Agencias v0.1.6</title>
+<title>Portal Agencias v0.1.7</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
@@ -146,7 +146,7 @@ h2{margin:0;font-size:17px;line-height:24px}
 'use strict';
 
 // ===================== CONFIG =====================
-const APP_VER = '0.1.6';
+const APP_VER = '0.1.7';
 const VER_KEY = 'portal';
 const SUPABASE_URL = 'https://unhirashjnabisxjnebf.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_rK8OeIsVb0J68Vf8OUcxRA_d8DSnSSI';
@@ -301,6 +301,10 @@ async function iniciar(session){
   if (S.channel){ sb.removeChannel(S.channel); S.channel = null; }
   if (S.user){
     try { await cargarAgencia(); } catch(e){ toast(errMsg(e)); }
+    if (!S.agencia){
+      const { data: op } = await sb.from('operadores').select('id,activo').eq('id', S.user.id).maybeSingle();
+      if (op && op.activo){ location.replace('operador.html'); return; }
+    }
     if (S.agencia && S.agencia.estado === 'aprobada') suscribir();
   }
   route();
@@ -336,7 +340,7 @@ function authSide(){
 
 function viewLogin(msg){
   app.innerHTML = '<div class="auth">'+authSide()+'<main class="auth-main"><form class="auth-form" id="fLogin" novalidate style="max-width:440px">'
-   + '<div><h2 style="font-size:28px;line-height:36px">Ingresar</h2><p class="muted" style="margin:6px 0 0">Accedé con el email y la contraseña de tu agencia.</p></div>'
+   + '<div><h2 style="font-size:28px;line-height:36px">Ingresar</h2><p class="muted" style="margin:6px 0 0">Agencias y operadores ingresan desde acá con su email y contraseña.</p></div>'
    + (msg ? '<div class="alert ok">'+esc(msg)+'</div>' : '')
    + '<div id="err" class="alert hidden"></div>'
    + '<div class="f"><label for="em">Email</label><input id="em" type="email" autocomplete="email" required></div>'
@@ -474,9 +478,9 @@ function viewRevision(){
 }
 
 function viewNoAgencia(){
-  app.innerHTML = '<div class="center"><div class="box"><h1 style="font-size:24px;line-height:32px">Este usuario no es una agencia</h1>'
-   + '<p class="muted" style="margin:0">Si sos operador, ingresá desde el panel de operadores.</p>'
-   + '<div class="row" style="justify-content:center"><a class="btn btn-s" href="operador.html">Ir al panel de operadores</a><button class="btn-link" id="bOut">Cerrar sesión</button></div></div></div>';
+  app.innerHTML = '<div class="center"><div class="box"><h1 style="font-size:24px;line-height:32px">Este usuario no tiene acceso</h1>'
+   + '<p class="muted" style="margin:0">No está registrado como agencia ni como operador activo. Si creés que es un error, comunicate con nosotros.</p>'
+   + '<div class="row" style="justify-content:center"><button class="btn btn-s" id="bOut">Cerrar sesión</button></div></div></div>';
   $('#bOut').onclick = salir;
 }
 

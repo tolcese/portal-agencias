@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Operadores · Portal Agencias v0.3.0</title>
+<title>Operadores · Portal Agencias v0.3.1</title>
 <meta name="robots" content="noindex">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -174,7 +174,7 @@ h2{margin:0;font-size:17px;line-height:24px}
 'use strict';
 
 // ===================== CONFIG =====================
-const APP_VER = '0.3.0';
+const APP_VER = '0.3.1';
 const VER_KEY = 'operador';
 const SUPABASE_URL = 'https://unhirashjnabisxjnebf.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_rK8OeIsVb0J68Vf8OUcxRA_d8DSnSSI';
@@ -310,8 +310,8 @@ function go(hash){ if (location.hash === hash) route(); else location.hash = has
 window.addEventListener('hashchange', route);
 function route(){
   const h = location.hash || '';
-  if (!S.user) return viewLogin();
-  if (!S.op) return viewNoOp();
+  if (!S.user) return location.replace('./');
+  if (!S.op) return location.replace('./');
   if (h.indexOf('#consulta/') === 0) return viewConsulta(Number(h.split('/')[1]));
   if (h === '#agencias') return viewAgencias();
   if (h === '#historial') return viewHistorial();
@@ -356,7 +356,7 @@ function suscribir(){
     .on('postgres_changes', { event:'*', schema:'public', table:'agencias' }, p=>recargar('agencias', p))
     .subscribe();
 }
-async function salir(){ await sb.auth.signOut(); location.hash=''; }
+async function salir(){ await sb.auth.signOut(); location.replace('./'); }
 sb.auth.onAuthStateChange((ev, session)=>{
   if (ev === 'SIGNED_OUT') return iniciar(null);
   if (ev === 'SIGNED_IN' && !(S.user && session && S.user.id === session.user.id)) iniciar(session);
@@ -1076,7 +1076,7 @@ async function viewOperadores(){
       return fail(m);
     }
     if (r && r.error) return fail(r.error);
-    const link = location.origin + location.pathname;
+    const link = location.origin + location.pathname.replace(/operador\.html$/, '');
     const texto = 'Hola '+nombre+', ya tenés acceso al panel de operadores.\nIngresá en: '+link+'\nUsuario: '+email+'\nContraseña temporal: '+password+'\nAl entrar, cambiala desde "Cambiar contraseña".';
     ventana('<h2 style="font-size:20px">Operador creado</h2><p>Pasale estos datos a <b>'+esc(nombre)+'</b>. La contraseña no se vuelve a mostrar.</p>'
       + '<div style="background:var(--bg);border-radius:10px;padding:14px;font-size:14px;line-height:22px;display:flex;flex-direction:column;gap:4px">'

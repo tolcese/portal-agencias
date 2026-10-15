@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Lukaya! - Portal Agencias v0.1.8</title>
+<title>Lukaya! - Portal Agencias v0.1.9</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
@@ -34,6 +34,9 @@ h2{margin:0;font-size:17px;line-height:24px}
 .nav{display:flex;align-items:center;min-height:44px;padding:0 12px;border-radius:8px;color:var(--navtxt);text-decoration:none;font-size:15px;background:none;border:0;text-align:left;cursor:pointer;width:100%}
 .nav:hover{color:#fff;background:#24324A}
 .nav.on{background:var(--nav2);color:#fff;font-weight:600}
+.nav .cnt{margin-left:auto;background:var(--accent);color:#fff;border-radius:999px;padding:1px 8px;font-size:12px;font-weight:600}
+.b-nuevaresp{background:var(--accent);color:#fff}
+.aviso{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:14px 18px;border-radius:12px;background:#FFF1E8;border:1px solid #F3C9AE;color:#7A2E0E;font-size:15px}
 .side-foot{margin-top:auto;padding:20px 12px 0;border-top:1px solid var(--nav2);color:var(--navtxt);font-size:13px;line-height:18px;display:flex;flex-direction:column;gap:10px}
 .side-foot button{background:none;border:0;color:#fff;text-decoration:underline;cursor:pointer;padding:0;text-align:left;font-size:13px}
 .main{flex:999 1 560px;min-width:0;padding:32px 40px;display:flex;flex-direction:column;gap:24px}
@@ -146,7 +149,7 @@ h2{margin:0;font-size:17px;line-height:24px}
 'use strict';
 
 // ===================== CONFIG =====================
-const APP_VER = '0.1.8';
+const APP_VER = '0.1.9';
 const VER_KEY = 'portal';
 const SUPABASE_URL = 'https://unhirashjnabisxjnebf.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_rK8OeIsVb0J68Vf8OUcxRA_d8DSnSSI';
@@ -160,7 +163,7 @@ const ESTADOS = {nueva:'Nueva', en_analisis:'En análisis', respondida:'Respondi
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const app = document.getElementById('app');
 
-let S = { user:null, agencia:null, bancos:null, consultas:[], channel:null, recovery:false, filtro:{q:'',estado:''}, pag:1 };
+let S = { user:null, agencia:null, bancos:null, consultas:[], channel:null, recovery:false, filtro:{q:'',estado:''}, pag:1, nuevasResp:[], avisadas:{} };
 const POR_PAG = 5;
 
 // ===================== HELPERS =====================
@@ -269,6 +272,65 @@ chequearVersion(true);
 setInterval(()=>chequearVersion(false), 3*60*1000);
 document.addEventListener('visibilitychange', ()=>{ if (document.visibilityState === 'visible') chequearVersion(false); });
 
+// ===================== AVISOS DE RESPUESTA =====================
+const TITULO_BASE = document.title;
+async function refrescarAvisos(){
+  if (!S.user || !S.agencia || S.agencia.estado !== 'aprobada') return;
+  const { data, error } = await sb.from('consultas').select('id,cliente_nombre').eq('estado','respondida').is('respuesta_vista_at', null);
+  if (error) return;
+  S.nuevasResp = data || [];
+  pintarAvisos();
+}
+function pintarAvisos(){
+  const n = S.nuevasResp.length;
+  document.title = (n ? '('+n+') ' : '') + TITULO_BASE;
+  const nav = document.querySelector('.nav[href="#panel"]');
+  if (nav){
+    let cnt = nav.querySelector('.cnt');
+    if (n){ if (!cnt){ cnt = document.createElement('span'); cnt.className = 'cnt'; nav.appendChild(cnt); } cnt.textContent = n; }
+    else if (cnt) cnt.remove();
+  }
+}
+function beep(){
+  try{
+    const C = window.AudioContext || window.webkitAudioContext; if (!C) return;
+    const ctx = new C(), o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = 'sine'; o.frequency.value = 880; o.connect(g); g.connect(ctx.destination);
+    g.gain.setValueAtTime(0.0001, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.2, ctx.currentTime + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.5);
+    o.start(); o.stop(ctx.currentTime + 0.55);
+  } catch(e){}
+}
+function avisarRespuesta(c){
+  if (S.avisadas[c.id]) return;
+  S.avisadas[c.id] = true;
+  beep();
+  const txt = 'La consulta N° '+nro(c.id)+' de '+(c.cliente_nombre||'tu cliente')+' ya tiene respuesta.';
+  let t = document.getElementById('avisoResp');
+  if (t) t.remove();
+  t = document.createElement('div'); t.id = 'avisoResp'; t.setAttribute('role','alert');
+  t.style.cssText = 'position:fixed;right:16px;top:16px;z-index:1002;background:#16202E;color:#fff;padding:14px 16px;border-radius:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;max-width:min(420px,92vw);box-shadow:0 10px 30px rgba(22,32,46,.35);font-size:14px;line-height:20px';
+  t.innerHTML = '<span>'+esc(txt)+'</span><div style="display:flex;gap:8px;margin-left:auto"><button type="button" data-x style="min-height:36px;padding:0 12px;border:1px solid #4A5A75;border-radius:8px;background:transparent;color:#fff;cursor:pointer">Cerrar</button><button type="button" data-v style="min-height:36px;padding:0 14px;border:0;border-radius:8px;background:#C2501C;color:#fff;font-weight:600;cursor:pointer">Ver respuesta</button></div>';
+  document.body.appendChild(t);
+  $('[data-x]', t).onclick = ()=>t.remove();
+  $('[data-v]', t).onclick = ()=>{ t.remove(); go('#consulta/'+c.id); };
+  try{
+    if ('Notification' in window && Notification.permission === 'granted' && document.visibilityState !== 'visible'){
+      const n = new Notification('Lukaya! · Respuesta nueva', { body: txt, tag: 'consulta-'+c.id });
+      n.onclick = ()=>{ window.focus(); go('#consulta/'+c.id); n.close(); };
+    }
+  } catch(e){}
+}
+async function activarNotificaciones(){
+  try{
+    if (!('Notification' in window)) return toast('Este navegador no permite notificaciones.');
+    const r = await Notification.requestPermission();
+    toast(r === 'granted' ? 'Listo, te vamos a avisar aunque estés en otra pestaña.' : 'No se activaron las notificaciones. Podés habilitarlas desde la configuración del navegador.');
+    const h = location.hash || ''; if (h === '' || h === '#panel') viewPanel(true);
+  } catch(e){}
+}
+
 // ===================== ROUTER =====================
 function go(hash){ if (location.hash === hash) route(); else location.hash = hash; }
 window.addEventListener('hashchange', route);
@@ -305,7 +367,7 @@ async function iniciar(session){
       const { data: op } = await sb.from('operadores').select('id,activo').eq('id', S.user.id).maybeSingle();
       if (op && op.activo){ location.replace('operador.html'); return; }
     }
-    if (S.agencia && S.agencia.estado === 'aprobada') suscribir();
+    if (S.agencia && S.agencia.estado === 'aprobada'){ suscribir(); refrescarAvisos(); }
   }
   route();
 }
@@ -314,6 +376,9 @@ function suscribir(){
     .on('postgres_changes', { event:'*', schema:'public', table:'consultas', filter:'agencia_id=eq.'+S.user.id }, payload=>{
       const h = location.hash || '';
       const id = payload.new && payload.new.id;
+      const nv = payload.new || {};
+      if (nv.estado === 'respondida' && !nv.respuesta_vista_at && h !== '#consulta/'+id) avisarRespuesta(nv);
+      refrescarAvisos();
       if (h === '' || h === '#panel') viewPanel(true);
       else if (id && h === '#consulta/'+id) viewDetalle(id, true);
     })
@@ -473,7 +538,7 @@ function viewRevision(){
    + '<div class="row between"><span class="muted">Estado</span>'+bTag+'</div></div>'
    + '<div class="row" style="justify-content:center"><button class="btn btn-s" id="bRe">Volver a intentar</button><button class="btn-link" id="bOut" style="font-size:15px;font-weight:600">Cerrar sesión</button></div>'
    + '</div></div>';
-  $('#bRe').onclick = async ()=>{ await cargarAgencia(); if (S.agencia && S.agencia.estado==='aprobada'){ suscribir(); location.hash=''; route(); } else toast('Tu cuenta sigue pendiente.'); };
+  $('#bRe').onclick = async ()=>{ await cargarAgencia(); if (S.agencia && S.agencia.estado==='aprobada'){ suscribir(); refrescarAvisos(); location.hash=''; route(); } else toast('Tu cuenta sigue pendiente.'); };
   $('#bOut').onclick = salir;
 }
 
@@ -493,7 +558,7 @@ function shell(activo, contenido){
     + '<div class="side-foot"><span>'+esc(a.responsable)+'<br>'+esc(a.razon_social)+'</span><button id="bOut">Cerrar sesión</button></div></nav>'
     + '<main class="main"><div class="wrap">'+contenido+'</div></main></div>';
 }
-function bindShell(){ const b = $('#bOut'); if (b) b.onclick = salir; }
+function bindShell(){ const b = $('#bOut'); if (b) b.onclick = salir; pintarAvisos(); }
 function abrirWhatsApp(){
   if (!WHATSAPP_NUM){ toast('El número de WhatsApp todavía no está configurado.'); return; }
   const a = S.agencia;
@@ -513,7 +578,7 @@ async function getBancos(){
 async function viewPanel(silencioso){
   if (!silencioso) app.innerHTML = shell('#panel', '<div class="loading" style="min-height:40vh"><span class="spin"></span>Cargando consultas…</div>');
   const { data, error } = await sb.from('consultas')
-    .select('id,cliente_nombre,cliente_dni,vehiculo_marca,vehiculo_modelo,vehiculo_anio,vehiculo_condicion,monto_a_financiar,estado,created_at')
+    .select('id,cliente_nombre,cliente_dni,vehiculo_marca,vehiculo_modelo,vehiculo_anio,vehiculo_condicion,monto_a_financiar,estado,created_at,respondida_at,respuesta_vista_at')
     .order('created_at', { ascending:false }).limit(500);
   if (error){ toast(errMsg(error)); return; }
   S.consultas = data || [];
@@ -521,10 +586,19 @@ async function viewPanel(silencioso){
   const ahora = new Date(), mes = ahora.getMonth(), anio = ahora.getFullYear();
   const enAnalisis = c.filter(x=>x.estado==='nueva'||x.estado==='en_analisis').length;
   const conResp = c.filter(x=>x.estado==='respondida').length;
+  const nuevas = c.filter(x=>x.estado==='respondida' && !x.respuesta_vista_at);
+  S.nuevasResp = nuevas.map(x=>({ id:x.id, cliente_nombre:x.cliente_nombre }));
+  const aviso = nuevas.length
+    ? '<div class="aviso"><span><b>'+(nuevas.length===1 ? 'Tenés 1 consulta con respuesta nueva' : 'Tenés '+nuevas.length+' consultas con respuesta nueva')+'</b>'+(nuevas.length===1?': N° '+nro(nuevas[0].id)+' · '+esc(nuevas[0].cliente_nombre):'')+'</span><a class="btn btn-p" href="#consulta/'+nuevas[0].id+'">'+(nuevas.length===1?'Ver respuesta':'Ver la primera')+'</a></div>'
+    : '';
+  const pedirNotif = ('Notification' in window && Notification.permission === 'default')
+    ? '<div class="note" style="align-items:center;justify-content:space-between;flex-wrap:wrap"><span>Activá los avisos para enterarte de las respuestas aunque estés en otra pestaña.</span><button class="btn btn-s" id="bNotif">Activar avisos</button></div>'
+    : '';
   const delMes = c.filter(x=>{ const d=new Date(x.created_at); return d.getMonth()===mes && d.getFullYear()===anio; }).length;
   const estOpts = '<option value="">Todos los estados</option>' + Object.keys(ESTADOS).map(k=>'<option value="'+k+'"'+(S.filtro.estado===k?' selected':'')+'>'+ESTADOS[k]+'</option>').join('');
   const html = '<div class="row between" style="gap:16px"><div><h1>Mis consultas</h1><p class="muted" style="margin:4px 0 0">'+esc(S.agencia.razon_social)+(S.agencia.localidad?', '+esc(S.agencia.localidad):'')+'</p></div>'
     + '<div class="row"><button class="btn btn-wa" id="bWa">'+ICON_WA+'Consulta por WhatsApp</button><a class="btn btn-p" href="#nueva">'+ICON_PLUS+'Nueva consulta</a></div></div>'
+    + aviso + pedirNotif
     + '<div class="tiles"><div class="tile"><span>En análisis</span><span style="color:var(--blue)">'+enAnalisis+'</span></div>'
     + '<div class="tile"><span>Con respuesta</span><span style="color:var(--b-r)">'+conResp+'</span></div>'
     + '<div class="tile"><span>Cargadas este mes</span><span>'+delMes+'</span></div></div>'
@@ -533,6 +607,8 @@ async function viewPanel(silencioso){
     + '<div id="lista"></div>';
   app.innerHTML = shell('#panel', html); bindShell();
   $('#bWa').onclick = abrirWhatsApp;
+  const bN = $('#bNotif'); if (bN) bN.onclick = activarNotificaciones;
+  pintarAvisos();
   $('#q').oninput = e=>{ S.filtro.q = e.target.value; S.pag = 1; pintarLista(); };
   $('#fe').onchange = e=>{ S.filtro.estado = e.target.value; S.pag = 1; pintarLista(); };
   pintarLista();
@@ -567,7 +643,7 @@ function pintarLista(){
         return '<tr class="click'+(x.estado==='respondida'?' hl':'')+'" data-id="'+x.id+'"><td>'+nro(x.id)+'</td>'
           + '<td><b>'+esc(x.cliente_nombre)+'</b><br><span class="muted">DNI '+esc(fmtDni(x.cliente_dni))+'</span></td>'
           + '<td>'+esc(veh||'—')+'</td><td>'+montoFin(x.monto_a_financiar)+'</td><td>'+fmtD(x.created_at)+'</td>'
-          + '<td>'+badge(x.estado)+'</td><td><a href="#consulta/'+x.id+'">Ver</a></td></tr>';
+          + '<td>'+((x.estado==='respondida' && !x.respuesta_vista_at) ? '<span class="b b-nuevaresp">● Respuesta nueva</span>' : badge(x.estado))+'</td><td><a href="#consulta/'+x.id+'">Ver</a></td></tr>';
       }).join('')
     + '</tbody></table></div>' + pager;
   const pp = $('#pgPrev'), pn = $('#pgNext');
@@ -711,6 +787,11 @@ async function viewDetalle(id, silencioso){
   if (rc.error){ toast(errMsg(rc.error)); return; }
   const c = rc.data;
   if (!c){ app.innerHTML = shell('#panel', '<div class="card"><h2>No encontramos esa consulta</h2><a href="#panel">Volver a mis consultas</a></div>'); bindShell(); return; }
+  if (c.respondida_at && !c.respuesta_vista_at){
+    sb.rpc('agencia_marcar_vista', { p_consulta:c.id }).then(()=>refrescarAvisos());
+    S.nuevasResp = S.nuevasResp.filter(x=>x.id !== c.id);
+    const t = document.getElementById('avisoResp'); if (t) t.remove();
+  }
   const ofertas = (ro.data || []).sort((a,b)=>{
     if (a.resultado !== b.resultado) return a.resultado === 'aprobado' ? -1 : 1;
     return ((a.banco&&a.banco.orden)||0) - ((b.banco&&b.banco.orden)||0);

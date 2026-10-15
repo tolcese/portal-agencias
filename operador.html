@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Lukaya! - Portal Operadores v0.3.2</title>
+<title>Lukaya! - Portal Operadores v0.3.3</title>
 <meta name="robots" content="noindex">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -174,7 +174,7 @@ h2{margin:0;font-size:17px;line-height:24px}
 'use strict';
 
 // ===================== CONFIG =====================
-const APP_VER = '0.3.2';
+const APP_VER = '0.3.3';
 const VER_KEY = 'operador';
 const SUPABASE_URL = 'https://unhirashjnabisxjnebf.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_rK8OeIsVb0J68Vf8OUcxRA_d8DSnSSI';
@@ -266,6 +266,20 @@ function busy(btn, on, txt){
   if (!btn) return;
   if (on){ btn.dataset.t = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spin"></span>' + (txt||''); }
   else { btn.disabled = false; if (btn.dataset.t) btn.innerHTML = btn.dataset.t; }
+}
+const ICON_WA = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8.5 8.5 0 0 1-12.6 7.4L3 21l1.6-5.2A8.5 8.5 0 1 1 21 12z"/></svg>';
+// Convierte un teléfono argentino al formato de WhatsApp (549 + área + número, sin 0 ni 15)
+function waNumero(tel){
+  let d = String(tel||'').replace(/\D/g,'');
+  if (!d) return null;
+  if (d.indexOf('00') === 0) d = d.slice(2);
+  if (d.indexOf('54') === 0){ d = d.slice(2); if (d[0] === '9') d = d.slice(1); }
+  if (d[0] === '0') d = d.slice(1);
+  if (d.length === 12){
+    for (const al of [4,3,2]){ if (d.substr(al,2) === '15'){ d = d.slice(0,al) + d.slice(al+2); break; } }
+  }
+  if (d.length !== 10) return null;
+  return '549' + d;
 }
 const ICON_LOCK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
 
@@ -650,11 +664,18 @@ function pintarConsulta(){
   const kv = (k, v, st)=>'<div class="kv"><span>'+k+'</span><span'+(st?' style="'+st+'"':'')+'>'+v+'</span></div>';
   let html = '<div><a href="#bandeja" style="font-size:14px;text-decoration:none">← Bandeja</a><div class="row"><h1>'+(editable?'Cargar ofertas · ':'')+'Consulta N° '+nro(c.id)+'</h1>'
     + badge(c.estado, c.operador_id && c.estado!=='nueva' ? opNombre(c.operador_id) : '')+'</div></div>';
+  if (c.agencia){
+    const wa = waNumero(c.agencia.telefono);
+    html += '<div class="row between" style="padding:14px 16px;background:#fff;border:1px solid var(--line);border-radius:12px">'
+      + '<span style="font-size:14px;line-height:20px"><b>'+esc(c.agencia.razon_social)+'</b><br><span class="muted">'+esc(c.agencia.responsable)+' · '+esc(c.agencia.telefono||'sin teléfono')+'</span></span>'
+      + (wa ? '<button type="button" class="btn btn-wa" id="bWaAg">'+ICON_WA+'WhatsApp a la agencia</button>'
+            : '<span class="muted" style="font-size:13px">El teléfono cargado no es válido para WhatsApp</span>')
+      + '</div>';
+  }
   if (c.estado === 'en_analisis' && !editable) html += '<div class="banner">'+ICON_LOCK+' Esta consulta la tiene '+esc(opNombre(c.operador_id))+'. Podés verla pero no modificarla.</div>';
   if (c.estado === 'nueva') html += '<div class="banner">Esta consulta todavía no fue tomada. <button class="btn btn-b btn-sm" id="bTomar" style="margin-left:8px">Tomar</button></div>';
 
   html += '<section class="card" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:18px">'
-    + kv('Agencia', esc(c.agencia?c.agencia.razon_social:'—')+'<br><span class="muted" style="font-size:13px">'+esc(c.agencia?(c.agencia.responsable+' · '+c.agencia.telefono):'')+'</span>')
     + kv('Cliente', esc(c.cliente_nombre)+'<br><span class="muted" style="font-size:13px">DNI '+esc(fmtDni(c.cliente_dni))+(c.cliente_cuit?' · CUIL '+esc(fmtCuit(c.cliente_cuit)):'')+'</span>')
     + kv('Vehículo', esc(veh)+(c.valor_vehiculo?'<br><span class="muted" style="font-size:13px">Valor '+money(c.valor_vehiculo)+'</span>':''))
     + kv('Necesita el cliente (neto)', montoFin(c.monto_a_financiar), c.monto_a_financiar?'':'font-weight:700;color:var(--b-r)')
@@ -729,6 +750,11 @@ function soloLectura(){
 
 function bindConsulta(){
   const ed = S.ed, c = ed.c;
+  const bWa = $('#bWaAg');
+  if (bWa) bWa.onclick = ()=>{
+    const msg = 'Hola '+c.agencia.responsable+', te escribo de Lukaya! por la consulta N° '+nro(c.id)+' de '+c.cliente_nombre+' (DNI '+fmtDni(c.cliente_dni)+'). ';
+    window.open('https://wa.me/'+waNumero(c.agencia.telefono)+'?text='+encodeURIComponent(msg), '_blank', 'noopener');
+  };
   $$('[data-dni]').forEach(b=> b.onclick = async ()=>{
     const { data, error } = await sb.storage.from('dni').createSignedUrl(b.dataset.dni, 600);
     if (error) return toast(errMsg(error));
